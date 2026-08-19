@@ -7,11 +7,11 @@ import {
   ShieldCheck,
   TrendingUp,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import gsap from 'gsap';
 
 
-const contentVariants = {
+const contentVariants: Variants = {
   hidden: { opacity: 0, x: -40 },
   visible: {
     opacity: 1,
@@ -20,7 +20,7 @@ const contentVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 20 } }
 };
