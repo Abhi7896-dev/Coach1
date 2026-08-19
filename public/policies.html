@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal & Compliance Center - TruCoach</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Plus+Jakarta+Sans:wght@400..800&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        display: ['"Bricolage Grotesque"', 'sans-serif'],
+                    },
+                    colors: {
+                        ink: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 500: '#64748b', 600: '#475569', 800: '#1e293b', 900: '#0f172a', 950: '#020617' },
+                        orange: { 400: '#fb923c', 500: '#f97316' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* ADDED MORE SPACING BETWEEN SECTIONS AND PARAGRAPHS */
+        h2 {
+            font-family: "Bricolage Grotesque", sans-serif;
+            font-weight: 700;
+            font-size: 1.75rem;
+            color: #020617;
+            margin-top: 3.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-family: "Bricolage Grotesque", sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: #020617;
+            margin-top: 2.5rem;
+            margin-bottom: 1.25rem;
+            border-left: 4px solid #f97316;
+            /* orange-500 */
+            background-color: #f8fafc;
+            /* ink-50 */
+            padding: 0.6rem 1rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            line-height: 1.8;
+        }
+
+        ul {
+            margin-bottom: 1.5rem;
+            list-style-type: disc;
+            padding-left: 1.5rem;
+            line-height: 1.8;
+        }
+
+        li {
+            margin-bottom: 0.75rem;
+        }
+    </style>
+</head>
+
+<body class="bg-white text-ink-800 font-sans antialiased selection:bg-orange-500/30">
+    <!-- Header -->
+    <header class="border-b border-ink-100 bg-white/80 backdrop-blur-xl sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="/" class="group flex items-center gap-3">
+                <img src="/logo.png" alt="TruCoach Logo"
+                    class="h-10 sm:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+                <span class="font-display text-xl sm:text-[22px] font-bold leading-none tracking-tight">
+                    <span class="text-blue-600">Tru</span><span class="text-orange-500">Coach</span>
+                </span>
+            </a>
+            <div class="hidden md:flex items-center gap-6 text-sm font-medium text-ink-500">
+                <a href="#privacy" class="hover:text-ink-900 transition-colors">Privacy</a>
+                <a href="#terms" class="hover:text-ink-900 transition-colors">Terms</a>
+                <a href="#refunds" class="hover:text-ink-900 transition-colors">Refunds</a>
+                <a href="#delivery" class="hover:text-ink-900 transition-colors">Delivery</a>
+                <a href="#contact" class="hover:text-ink-900 transition-colors">Contact</a>
+            </div>
+            <a href="/" class="text-sm font-medium text-ink-500 hover:text-ink-900 transition-colors">&larr; Back to
+                App</a>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <main class="max-w-3xl mx-auto px-6 py-16 md:py-24 space-y-24">
+
+        <!-- Header info -->
+        <div>
+            <h1 class="font-display text-4xl font-bold text-ink-950 mb-6">TruCoach Legal & Compliance Center</h1>
+            <div class="bg-ink-50/60 p-6 rounded-2xl border border-ink-100 text-sm text-ink-600 space-y-2">
+                <p class="mb-0"><strong>Applicable Entity:</strong> TruCoach Platform (India)</p>
+                <p class="mb-0"><strong>Effective Date:</strong> August 17, 2026</p>
+                <p class="mb-0"><strong>Governing Laws:</strong> Digital Personal Data Protection (DPDP) Act 2023,
+                    Information Technology Act 2000, & RBI Guidelines for Payment Aggregators.</p>
+            </div>
+        </div>
+
+        <!-- Privacy Policy -->
+        <section id="privacy" class="scroll-mt-24">
+            <h2 class="font-display text-3xl font-bold text-ink-950 border-b border-ink-100 pb-3 mb-8 mt-0">1. PRIVACY
+                POLICY</h2>
+            <div class="text-ink-800 leading-relaxed text-lg">
+                <h3>1.1 Data We Collect</h3>
+                <ul>
+                    <li><strong>User & Coach Profiles</strong>: Full name, mobile phone number, email address, physical
+                        address/pincode, academy affiliation, and coaching certifications.</li>
+                    <li><strong>Athletes & Minors</strong>: Athlete name, age, Parent/Guardian details. All data
+                        regarding Students is collected strictly with
+                        the explicit digital consent of their verified parent or legal guardian or Academy Coach.</li>
+                    <li><strong>Payments & Billing</strong>: Gateway order IDs, transaction timestamps, payment status,
+                        and bank reference/UTR numbers. (Note: Card numbers and UPI PINs are processed directly by
+                        RBI-licensed payment gateways and TruCoach does not collect or process biometric data;
+                        FaceID/fingerprint auth is handled entirely by the device OS).</li>
+                    <li><strong>Location & Geolocation</strong>: Precise GPS location and pincodes used exclusively for
+                        discovering nearby sports academies, batches, and tournaments.</li>
+                    <li><strong>Device Security & Biometrics</strong>: FaceID and fingerprint authentication are
+                        processed locally within the device's secure hardware enclave and are never transmitted to or
+                        stored on our servers.</li>
+                </ul>
+
+                <h3>1.2 Purpose & Use of Data</h3>
+                <p>Collected data is used strictly to:</p>
+                <ul>
+                    <li>Manage academy batches, rosters, and schedules.</li>
+                    <li>Calculate live attendance and generate monthly progress report cards.</li>
+                    <li>Route automated billing links and instant digital receipts via payment gateways.</li>
+                    <li>Display nearby sports coaching facilities on the community discovery page.</li>
+                </ul>
+
+                <h3>1.3 Strict Data Protection & Non-Disclosure</h3>
+                <ul>
+                    <li><strong>Zero Commercial Sale</strong>: TruCoach has not signed, and will never sign, any
+                        agreement to sell, rent, monetize, or share student, parent, or coach data with third-party
+                        advertisers, data brokers, or marketing agencies.</li>
+                    <li><strong>No Commercial Behavioural Ads</strong>: The platform does not serve commercial
+                        third-party ads. Minor profiles are strictly private and shielded from public web crawlers.</li>
+                    <li><strong>Authorized Infrastructure Sub-processors</strong>: Data is processed solely through
+                        enterprise compliance partners:
+                        <ul class="mt-2">
+                            <li><strong>Cashfree Payments</strong>: For processing secure UPI/card payment sessions and
+                                payouts.</li>
+                            <li><strong>Meta (WhatsApp Cloud API)</strong>: For server-side delivery of transactional
+                                attendance, billing notices, and official payment receipts.</li>
+                            <li><strong>Supabase / Cloud Infrastructure</strong>: Encrypted database storage with
+                                Row-Level Security (RLS).</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>1.4 Meta WhatsApp Communication & Opt-Out</h3>
+                <p>By registering their phone number on TruCoach, users explicitly consent to receiving operational and
+                    transactional WhatsApp messages (attendance absentee alerts, emergency / Personal cancellations,
+                    schedule
+                    shifts, and payment receipts). Users may manage notification preferences or request communication
+                    opt-out at any time via App Settings or by emailing support@trucoach.co.in</p>
+
+                <h3>1.5 Data Retention & User Rights (DPDP Act 2023)</h3>
+                <p>Users have the absolute right to review, update, export, or request permanent deletion of their
+                    account and associated student records. Deletion requests can be initiated from the App profile
+                    screen or by contacting TruCoach at support@trucoach.co.in.</p>
+            </div>
+        </section>
+
+        <!-- Terms of Service -->
+        <section id="terms" class="scroll-mt-24">
+            <h2 class="font-display text-3xl font-bold text-ink-950 border-b border-ink-100 pb-3 mb-8 mt-0">2. TERMS &
+                CONDITIONS</h2>
+            <div class="text-ink-800 leading-relaxed text-lg">
+                <h3>2.1 Role & Platform Intermediary Status</h3>
+                <p>TruCoach operates exclusively as a digital Automation platfrom connecting sports academies,
+                    certified / Experienced coaches, and parents. TruCoach does not operate sports physical facilities
+                    and is not an
+                    employer of independent academy coaches.</p>
+
+                <h3>2.2 Academy & Coach Verification Gate</h3>
+                <p>All new Academy Admins and Coaches must undergo verification review before creating batches or
+                    issuing fee invoices. Uploading fabricated certifications or misrepresenting credentials results in
+                    immediate account termination.</p>
+
+                <h3>2.3 SaaS Subscription & Free Trial</h3>
+                <ul>
+                    <li><strong>15-Day Academy Free Trial</strong>: New academies receive 15 days of full platform
+                        access with zero software licensing charges.</li>
+                    <li><strong>Subscription Billing</strong>: Continued operational use after 15 days (tracking
+                        attendance, issuing fee invoices, automated broadcasts) transitions the academy account to the
+                        applicable SaaS tier.</li>
+                    <li><strong>Unbilled Usage</strong>: Termination of service does not waive outstanding SaaS
+                        subscription fees incurred during active billing cycles.</li>
+                </ul>
+
+                <h3>2.4 Payments & Zero-Custody Escrow Model</h3>
+                <ul>
+                    <li><strong>Direct P2B Settlement</strong>: Tuition fees paid by parents are settled directly to the
+                        designated academy/coach merchant account via Payment Gateway(eg. Cashfree). TruCoach maintains
+                        a
+                        zero-custody model and does not hold or pool student tuition funds in escrow.</li>
+                    <li><strong>GST & Tax Compliance</strong>: Academies are solely responsible for calculating and
+                        remitting applicable Goods and Services Tax (GST) on coaching fees. Standard 18% GST applies to
+                        SaaS software subscription invoices issued by TruCoach.</li>
+                </ul>
+
+                <h3>2.5 Code of Conduct & Content Standards</h3>
+                <ul>
+                    <li><strong>Zero Tolerance for Inappropriate Content</strong>: Coaches, academies, and users must
+                        not strictly upload obscene, defamatory, sexually suggestive, or abusive text, media, or
+                        comments.</li>
+                    <li><strong>Mandatory Venue & Schedule Updates</strong>: Academies must immediately update the app
+                        if a physical venue relocates or closes. TruCoach is not liable for disputes arising from
+                        unannounced physical facility closures.</li>
+                </ul>
+
+                <h3>2.6 Physical Sports & Injury Liability Waiver</h3>
+                <p>Athletic training inherently involves physical exertion and bodily injury risk. Parents and guardians
+                    acknowledge this risk upon enrolling students. TruCoach, as a software intermediary, bears no
+                    liability for injuries, accidents, equipment failures, or medical emergencies occurring on physical
+                    sports grounds.</p>
+
+                <p><strong>Property Damage Liability:</strong> Any physical damages caused by a student to the academy's premises, facilities, or training equipment—whether during a free trial or active enrollment—must be fully compensated by the student's parent or legal guardian. TruCoach assumes no responsibility or liability for property damage occurring at physical training centers.</p>
+
+                <p><strong>Code of Conduct & Misconduct Policy:</strong> TruCoach mandates strict professionalism, discipline, and respect between tutors, coaches, academies, parents, and students. We maintain a zero-tolerance policy for any form of abuse or misconduct. Any coach, tutor, or academy reported for misconduct toward students will be permanently banned from the platform. The respective coach, tutor, or academy is solely and legally responsible for addressing parents, legal guardians, or legal authorities regarding any allegations of misconduct. TruCoach acts only as a software intermediary and holds no liability for the behavioral misconduct of independent parties.</p>
+            </div>
+        </section>
+
+        <!-- Refund Policy -->
+        <section id="refunds" class="scroll-mt-24">
+            <h2 class="font-display text-3xl font-bold text-ink-950 border-b border-ink-100 pb-3 mb-8 mt-0">3.
+                CANCELLATION & REFUND POLICY</h2>
+            <div class="text-ink-800 leading-relaxed text-lg">
+                <h3>3.1 Academy SaaS Platform Subscriptions</h3>
+                <ul>
+                    <li>Academies may cancel their SaaS software subscription at any time via the Admin Command Center.
+                    </li>
+                    <li>Subscriptions cancelled within 48 hours of initial activation without substantial usage are
+                        eligible for No Charges</li>
+                    <li>Once an active billing cycle has processed automated student billing links, software
+                        subscription fees for that cycle are non-refundable.</li>
+                </ul>
+
+                <h3>3.2 Student Academy Tuition Fees</h3>
+                <ul>
+                    <li>TruCoach provides the software conduit for fee invoicing. The underlying tuition agreement is
+                        between the Parent and the respective Sports Academy.</li>
+                    <li><strong>Refund Eligibility</strong>: Tuition fee refund requests (e.g., student relocation,
+                        medical leaves, voluntary withdrawal) are governed directly by the respective Academy’s refund
+                        rules.</li>
+                    <li>If an academy approves a tuition refund, it can be initiated through the payment dashboard, and
+                        the refunded amount will credit back to the parent's original payment source (UPI/Bank/Card)
+                        within 5–7 business days as per banking standards.</li>
+                </ul>
+
+                <h3>3.3 Free Trial Cancellation</h3>
+                <p>Parents may cancel scheduled 1-day Free Trial sessions at any time prior to session start with zero
+                    penalty. The free trial credit is immediately restored to the parent's account.</p>
+            </div>
+        </section>
+
+        <!-- Digital Service Policy -->
+        <section id="delivery" class="scroll-mt-24">
+            <h2 class="font-display text-3xl font-bold text-ink-950 border-b border-ink-100 pb-3 mb-8 mt-0">4. DIGITAL
+                SERVICE DELIVERY POLICY</h2>
+            <div class="text-ink-800 leading-relaxed text-lg">
+                <ul>
+                    <li><strong>Instant Fulfillment</strong>: All software features, attendance dashboards, Community
+                        listings, and digital receipts are fulfilled immediately and electronically upon successful
+                        account creation or payment confirmation.</li>
+                    <li>No physical merchandise shipping is involved unless explicitly approved by Platfrom
+                        Administrators (TruCoach)</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Contact Us -->
+        <section id="contact" class="scroll-mt-24">
+            <h2 class="font-display text-3xl font-bold text-ink-950 border-b border-ink-100 pb-3 mb-8 mt-0">5. CONTACT &
+                GRIEVANCE OFFICER DETAILS</h2>
+            <div class="text-ink-800 leading-relaxed text-lg">
+                <p>In compliance with the Information Technology Act 2000 and DPDP Act 2023:</p>
+                <div class="bg-ink-50/60 p-8 md:p-10 rounded-3xl border border-ink-100 mt-8">
+                    <h3 class="font-display text-xl font-bold text-ink-950 mb-4 mt-0">Contact Info</h3>
+                    <strong>Name:</strong> Abhishek khode / Ashley Albert
+
+                    <p class="text-ink-600 leading-relaxed mb-6">
+
+                        <strong>Support Email:</strong> <a href="mailto:support@trucoach.co.in" class="text-orange-600 hover:text-orange-700">support@trucoach.co.in</a>
+                    </p>
+                    <div class="bg-orange-50/50 p-5 rounded-2xl border border-orange-100">
+                        <p class="text-orange-900 text-sm font-medium mb-0 leading-relaxed"><strong>Note:</strong> We
+                            typically respond to all email inquiries within 24-48 business hours. Please include your
+                            registered phone number in the email for faster resolution.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-ink-100 bg-ink-50/60 py-12 mt-12">
+        <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p class="text-xs text-ink-500">&copy; 2026 TruCoach. All rights reserved.</p>
+            <div class="flex flex-wrap gap-6 text-xs text-ink-500">
+                <a href="#privacy" class="hover:text-ink-900 transition-colors">Privacy Policy</a>
+                <a href="#terms" class="hover:text-ink-900 transition-colors">Terms of Service</a>
+                <a href="#refunds" class="hover:text-ink-900 transition-colors">Refund Policy</a>
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>

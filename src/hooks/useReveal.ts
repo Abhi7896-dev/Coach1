@@ -50,13 +50,14 @@ export function useActiveSection(ids: string[]) {
             if (entry.isIntersecting) setActive(id);
           });
         },
-        { threshold: 0.4, rootMargin: '-20% 0px -40% 0px' },
+        { threshold: 0, rootMargin: '-30% 0px -60% 0px' },
       );
       io.observe(el);
       observers.push(io);
     });
     return () => observers.forEach((io) => io.disconnect());
-  }, [ids]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids.join(',')]);
 
   return active;
 }

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import {
   CalendarCheck,
   FileText,
@@ -6,6 +7,23 @@ import {
   ShieldCheck,
   TrendingUp,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import gsap from 'gsap';
+
+
+const contentVariants = {
+  hidden: { opacity: 0, x: -40 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { staggerChildren: 0.1, type: 'spring', stiffness: 100, damping: 20 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 20 } }
+};
 
 const PARENT_IMG =
   'https://images.pexels.com/photos/28260827/pexels-photo-28260827.jpeg?auto=compress&cs=tinysrgb&h=900&w=1300';
@@ -13,64 +31,90 @@ const PARENT_IMG =
 const BENEFITS = [
   {
     icon: CalendarCheck,
-    title: 'Live attendance',
-    body: "The moment your child checks into a session, you know. No more wondering whether practice happened.",
+    title: 'E Power System',
+    body: "TruCoach not only Provides Automaiton but also builds a Community Ecosystem to explore, attend Upcoming or Ongoing Diff. Sports Events across the City.",
   },
   {
-    icon: MessageSquareText,
-    title: 'Digital progress remarks',
-    body: "Real, written feedback from the coach after sessions — strengths, areas to work on, milestones reached.",
+    icon: TrendingUp,
+    title: 'Monthly Progress PDF Cards',
+    body: "Receive automated monthly report cards with skill evaluations, discipline ratings, and detailed coach feedback.",
   },
   {
     icon: FileText,
-    title: 'Professional receipts',
-    body: "Every payment generates a clean, shareable receipt delivered to your phone. Your records, always tidy.",
+    title: '1-Tap Fee Payment',
+    body: "Pay seamlessly with UPI, Cards, or Netbanking. Get instant official digital receipts delivered directly to your WhatsApp.",
   },
   {
     icon: Bell,
-    title: 'Event & reminder alerts',
-    body: "Match days, schedule changes, and fee reminders arrive as WhatsApp notifications. You stay in the loop effortlessly.",
+    title: 'Free Trial Booking & Discovery',
+    body: "Explore top-Experienced local sports Coaches across multiple sports. Use your free trial passes to book sessions & discover the perfect coach for your child.",
   },
 ];
 
 export function ForParents() {
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.to('.parent-image-zoom', {
+        scale: 1.15,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top bottom',
+          end: 'bottom top',
+          scrub: true,
+        }
+      });
+    }, sectionRef);
+    return () => ctx.revert();
+  }, []);
+
   return (
     <section
+      ref={sectionRef}
       id="parents"
-      className="relative scroll-mt-24 overflow-hidden bg-blue-950 py-24 text-white lg:py-32"
+      className="relative scroll-mt-24 overflow-hidden bg-blue-950 py-16 text-white lg:py-24"
     >
       <div className="absolute inset-0 -z-10">
         <div className="absolute -right-40 -top-20 h-[500px] w-[500px] rounded-full bg-blue-500/25 blur-[120px]" />
         <div className="absolute -left-32 bottom-0 h-[440px] w-[440px] rounded-full bg-green-500/15 blur-[120px]" />
-        <div className="absolute inset-0 grid-bg opacity-[0.12]" />
+        <div className="absolute inset-0 grid-bg opacity-[0.25]" />
       </div>
 
       <div className="container-page">
         <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
           {/* Copy */}
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-ink-200 backdrop-blur reveal">
+          {/* Copy */}
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-10%" }}
+            variants={contentVariants}
+          >
+            <motion.span variants={itemVariants} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-ink-200 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
               For the Parent
-            </span>
-            <h2 className="reveal mt-5 font-display text-3xl font-700 leading-tight tracking-tight sm:text-4xl lg:text-[2.9rem]">
+            </motion.span>
+            <motion.h2 variants={itemVariants} className="mt-5 font-display text-3xl font-700 leading-tight tracking-tight sm:text-4xl lg:text-[2.9rem]">
               A transparent window into
               <br />
               <span className="bg-gradient-to-r from-blue-300 via-blue-200 to-green-300 bg-clip-text text-transparent">
                 your child's growth.
               </span>
-            </h2>
-            <p className="reveal reveal-delay-1 mt-5 max-w-xl text-lg leading-relaxed text-ink-200">
+            </motion.h2>
+            <motion.p variants={itemVariants} className="mt-5 max-w-xl text-lg leading-relaxed text-ink-200">
               Peace of mind, in your pocket. See exactly what happens at practice,
-              read what the coach thinks, and hold a tidy record of every payment —
-              all without chasing anyone for updates.
-            </p>
+              receive monthly PDF progress cards, pay fees in one tap —
+              and easily discover new local sports communities and verified tutors.
+            </motion.p>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2">
+            <motion.div variants={itemVariants} className="mt-10 grid gap-4 sm:grid-cols-2">
               {BENEFITS.map((b, i) => (
-                <div
+                <motion.div
                   key={b.title}
-                  className={`reveal reveal-delay-${(i % 4) + 1} group rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-blue-300/40 hover:bg-white/10`}
+                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                  className="group rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur transition-all duration-300 hover:border-blue-300/40 hover:bg-white/10"
                 >
                   <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-500/15 text-blue-300 transition-colors group-hover:bg-blue-400 group-hover:text-blue-950">
                     <b.icon className="h-5.5 w-5.5" />
@@ -79,15 +123,21 @@ export function ForParents() {
                     {b.title}
                   </h3>
                   <p className="mt-2 text-sm leading-relaxed text-ink-300">{b.body}</p>
-                </div>
+                </motion.div>
               ))}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Phone mockup */}
-          <div className="reveal reveal-delay-2 relative mx-auto">
+          <motion.div 
+            initial={{ opacity: 0, x: 40 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-10%" }}
+            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+            className="relative mx-auto"
+          >
             <PhoneMockup />
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -102,7 +152,7 @@ function PhoneMockup() {
         <img
           src={PARENT_IMG}
           alt=""
-          className="h-full w-full object-cover"
+          className="parent-image-zoom h-full w-full object-cover"
           loading="lazy"
           aria-hidden
         />
@@ -193,9 +243,8 @@ function PhoneMockup() {
               {[CalendarCheck, MessageSquareText, FileText, Bell].map((Icon, i) => (
                 <span
                   key={i}
-                  className={`grid h-8 w-8 place-items-center rounded-lg ${
-                    i === 0 ? 'bg-blue-100 text-blue-600' : 'text-ink-300'
-                  }`}
+                  className={`grid h-8 w-8 place-items-center rounded-lg ${i === 0 ? 'bg-blue-100 text-blue-600' : 'text-ink-300'
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                 </span>

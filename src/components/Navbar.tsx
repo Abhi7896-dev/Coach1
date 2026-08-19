@@ -7,13 +7,14 @@ const LINKS = [
   { id: 'coaches', label: 'For Coaches' },
   { id: 'parents', label: 'For Parents' },
   { id: 'community', label: 'Community' },
+  { id: 'about', label: 'About Us' },
   { id: 'security', label: 'Security' },
 ];
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const active = useActiveSection(['coaches', 'parents', 'community', 'security']);
+  const active = useActiveSection(['coaches', 'parents', 'community', 'about', 'security']);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -47,7 +48,7 @@ export function Navbar() {
               href={`#${link.id}`}
               className={`rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                 active === link.id
-                  ? 'text-ink-950'
+                  ? 'text-blue-600'
                   : 'text-ink-500 hover:text-ink-900'
               }`}
             >

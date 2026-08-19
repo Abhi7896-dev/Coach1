@@ -1,13 +1,27 @@
-import { ArrowRight, MapPin, GraduationCap, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, MapPin, GraduationCap, Sparkles, X, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const CTA_IMG =
   'https://images.pexels.com/photos/10347891/pexels-photo-10347891.jpeg?auto=compress&cs=tinysrgb&h=900&w=1400';
 
 export function CallToAction() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitted(true);
+    setTimeout(() => {
+      setIsModalOpen(false);
+      setTimeout(() => setIsSubmitted(false), 300); // reset after closing
+    }, 2000);
+  };
+
   return (
-    <section id="join" className="relative scroll-mt-24 overflow-hidden py-24 lg:py-32">
+    <section id="join" className="relative scroll-mt-24 overflow-hidden py-16 lg:py-24">
       <div className="container-page">
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-ink-950 px-6 py-16 text-center text-white sm:px-12 lg:py-24">
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-ink-950 px-6 py-16 text-center text-white sm:px-12 lg:py-20">
           {/* Background image */}
           <div className="absolute inset-0 -z-10">
             <img
@@ -34,15 +48,18 @@ export function CallToAction() {
             </span>
           </h2>
           <p className="reveal reveal-delay-2 mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-200">
-            Whether you coach or cheer, Academy Manager brings your academy
+            Whether you coach or cheer, TruCoach brings your academy
             closer to the people who matter. Pick your path and get started today.
           </p>
 
           <div className="reveal reveal-delay-3 mt-10 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
-            <a href="#top" className="btn-primary !px-7 !py-4 !text-base">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn-primary !px-7 !py-4 !text-base"
+            >
               <GraduationCap className="h-5 w-5" />
               Join the Ecosystem as a Tutor
-            </a>
+            </button>
             <a
               href="#coaches"
               className="btn-secondary !bg-white/10 !px-7 !py-4 !text-base !text-white hover:!bg-white/15"
@@ -53,11 +70,96 @@ export function CallToAction() {
             </a>
           </div>
 
-          <p className="reveal reveal-delay-4 mt-6 text-sm text-ink-400">
-            Free to get started. No credit card required.
-          </p>
+          <div className="reveal reveal-delay-4 mt-8 flex flex-col items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white ring-1 ring-white/20 backdrop-blur">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+              </span>
+              Launching Shortly on App Store & Google Play
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Tutor Join Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm" 
+              onClick={() => !isSubmitted && setIsModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="relative w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-8 text-left shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)]"
+            >
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="absolute right-5 top-5 rounded-full p-2 text-ink-400 transition-colors hover:bg-ink-50 hover:text-ink-900"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <AnimatePresence mode="wait">
+                {isSubmitted ? (
+                  <motion.div 
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex flex-col items-center py-10 text-center"
+                  >
+                    <div className="grid h-16 w-16 place-items-center rounded-full bg-green-100 text-green-600">
+                      <CheckCircle2 className="h-8 w-8" />
+                    </div>
+                    <h3 className="mt-6 font-display text-2xl font-bold text-ink-950">Application Received!</h3>
+                    <p className="mt-2 text-ink-500">Our team will contact you shortly to verify your details.</p>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="form"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <h3 className="font-display text-2xl font-bold text-ink-950">Join as a Tutor</h3>
+                    <p className="mt-2 text-sm text-ink-500">
+                      Fill in your details to get early access to the TruCoach platform.
+                    </p>
+
+                    <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-ink-900">Full Name</label>
+                        <input required type="text" placeholder="e.g. Coach Ramesh" className="w-full rounded-xl border border-ink-200 px-4 py-3.5 text-sm text-ink-900 outline-none transition-colors focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-ink-900">Phone Number</label>
+                        <input required type="tel" placeholder="+91 98765 43210" className="w-full rounded-xl border border-ink-200 px-4 py-3.5 text-sm text-ink-900 outline-none transition-colors focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-ink-900">Academy / Specialization</label>
+                        <input required type="text" placeholder="e.g. Football Academy or Private Tutor" className="w-full rounded-xl border border-ink-200 px-4 py-3.5 text-sm text-ink-900 outline-none transition-colors focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                      </div>
+                      
+                      <button type="submit" className="btn-primary mt-2 w-full !py-4">
+                        Submit Application
+                      </button>
+                    </form>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

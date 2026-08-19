@@ -13,7 +13,7 @@ const PILLARS = [
   },
   {
     icon: Lock,
-    title: 'Encrypted child data',
+    title: 'Encrypted Student data',
     body: "Attendance, progress remarks, and personal details are encrypted in transit and at rest.",
   },
   {
@@ -55,9 +55,9 @@ export function Security() {
             </span>
           </h2>
           <p className="reveal reveal-delay-1 mt-5 text-lg leading-relaxed text-ink-200">
-            Child data is sacred. Academy Manager uses bank-grade security
-            practices so families can engage with total confidence — and coaches
-            can focus on coaching, not compliance.
+            Student data and Multi-Tenant Privacy is sacred. TruCoach uses bank-grade security
+            practices and strict HMAC-SHA256 signature verification so families can engage
+            with total confidence — and coaches can focus on coaching, not compliance.
           </p>
         </div>
 

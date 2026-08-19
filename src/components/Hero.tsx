@@ -1,46 +1,91 @@
+import { useEffect, useRef } from 'react';
 import { ArrowRight, MapPin, Star, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { motion } from 'framer-motion';
+import gsap from 'gsap';
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 20 } }
+};
 
 const HERO_IMG =
   'https://images.pexels.com/photos/9517922/pexels-photo-9517922.jpeg?auto=compress&cs=tinysrgb&h=900&w=1400';
 
 export function Hero() {
+  const containerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 0.5,
+        }
+      });
+
+      tl.to('.parallax-bg-1', { y: -100, ease: 'none' }, 0)
+        .to('.parallax-bg-2', { y: -200, ease: 'none' }, 0)
+        .to('.parallax-bg-3', { y: -300, ease: 'none' }, 0)
+        .to('.hero-text-container', { y: 150, opacity: 0, ease: 'none' }, 0)
+        .to('.hero-image-container', { y: -80, opacity: 0.2, ease: 'none' }, 0);
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <section id="top" className="relative overflow-hidden bg-ink-950 text-white">
-      {/* Background layers */}
+    <section ref={containerRef} id="top" className="relative overflow-hidden bg-ink-950 text-white">
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 grid-bg opacity-[0.18]" />
-        <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-orange-600/25 blur-[120px]" />
-        <div className="absolute -right-32 top-20 h-[460px] w-[460px] rounded-full bg-blue-600/25 blur-[120px]" />
-        <div className="absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full bg-green-500/15 blur-[120px]" />
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.4, 0.3] }} 
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="parallax-bg-1 absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-orange-600/30 blur-[120px]" 
+        />
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.3, 0.2] }} 
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          className="parallax-bg-2 absolute -right-32 top-20 h-[500px] w-[500px] rounded-full bg-blue-600/30 blur-[120px]" 
+        />
+        <div className="parallax-bg-3 absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full bg-green-500/15 blur-[120px]" />
       </div>
 
-      <div className="container-page relative pt-28 pb-20 sm:pt-36 lg:pb-28">
+      <div className="container-page relative pt-20 pb-16 sm:pt-28 lg:pb-20">
         <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
           {/* Copy */}
-          <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-ink-200 backdrop-blur animate-fade-in">
+          <motion.div 
+            initial="hidden"
+            animate="visible"
+            variants={{
+              visible: { transition: { staggerChildren: 0.1 } }
+            }}
+            className="hero-text-container max-w-2xl"
+          >
+            <motion.span variants={itemVariants} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-ink-200 backdrop-blur">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-orange-400" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-400" />
               </span>
-              The Academy Ecosystem
-            </span>
+              The Complete Sports Community
+            </motion.span>
 
-            <h1 className="mt-6 font-display text-[2.6rem] font-700 leading-[1.04] tracking-tight sm:text-6xl lg:text-[4.1rem] animate-fade-up">
-              Empowering Local Coaches.
-              <br />
+            <motion.h1 variants={itemVariants} className="mt-6 font-display text-[2.6rem] font-700 leading-[1.04] tracking-tight sm:text-6xl lg:text-[4.1rem]">
+              Empowering Coaches.<br />
+              Delighting Parents.<br />
               <span className="bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent">
-                Connecting Future Stars.
+                Building Champions.
               </span>
-            </h1>
+            </motion.h1>
 
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-200 animate-fade-up [animation-delay:0.1s]">
-              Academy Manager simplifies the business of coaching so trainers can
-              focus on what they do best — building champions. One ecosystem for
-              batches, portfolios, payments, and parent communication.
-            </p>
+            <motion.p variants={itemVariants} className="mt-6 max-w-xl text-lg leading-relaxed text-ink-200">
+              TruCoach is the premier real-time sports Community and operating system.
+              Discover verified local tutors, book free trials, and join a multi-sport
+              community—while we automate the attendance, fees, and communication for the coaches.
+            </motion.p>
 
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center animate-fade-up [animation-delay:0.2s]">
+            <motion.div variants={itemVariants} className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a href="#join" className="btn-primary !px-7 !py-4 !text-base">
                 Join the Ecosystem as a Tutor
                 <ArrowRight className="h-4.5 w-4.5" />
@@ -49,10 +94,17 @@ export function Hero() {
                 <MapPin className="h-4.5 w-4.5" />
                 Discover Academies Near You
               </a>
-            </div>
+            </motion.div>
 
             {/* Trust row */}
-            <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm text-ink-300 animate-fade-up [animation-delay:0.3s]">
+            <motion.div variants={itemVariants} className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4 text-sm text-ink-300">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 font-medium text-white ring-1 ring-white/20">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+                </span>
+                Launching Shortly on App Store & Google Play
+              </span>
               <span className="inline-flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-green-400" />
                 OTP &amp; Biometric secured
@@ -65,22 +117,27 @@ export function Hero() {
                 <Users className="h-4 w-4 text-blue-400" />
                 Built for Sports, Arts &amp; Academics
               </span>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Visual */}
-          <div className="relative animate-fade-up [animation-delay:0.25s]">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            className="hero-image-container relative"
+          >
             <HeroVisual />
-          </div>
+          </motion.div>
         </div>
 
         {/* Stat bar */}
-        <div className="mt-16 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5 sm:grid-cols-4 animate-fade-up [animation-delay:0.4s]">
+        {/* <div className="mt-16 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5 sm:grid-cols-4 animate-fade-up [animation-delay:0.4s]">
           {[
             { icon: Users, value: '12K+', label: 'Active learners', color: 'text-orange-400' },
             { icon: Star, value: '850+', label: 'Verified coaches', color: 'text-blue-400' },
-            { icon: MapPin, value: '40+ pincodes', label: 'Local discovery', color: 'text-green-400' },
-            { icon: TrendingUp, value: '99.2%', label: 'Attendance accuracy', color: 'text-orange-400' },
+            { icon: MapPin, value: 'Multi-Sport', label: 'Local discovery', color: 'text-green-400' },
+            { icon: TrendingUp, value: 'Real-Time', label: 'Updates & tracking', color: 'text-orange-400' },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-3 bg-ink-950/40 px-5 py-5">
               <s.icon className={`h-5 w-5 ${s.color}`} />
@@ -90,7 +147,7 @@ export function Hero() {
               </div>
             </div>
           ))}
-        </div>
+        </div> */}
       </div>
     </section>
   );
