@@ -1,3 +1,3 @@
-# Coach1
+# TruCoach
 
-[![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/~/sb1-beph2fvo)
+The Complete Sports Community & Operating System.

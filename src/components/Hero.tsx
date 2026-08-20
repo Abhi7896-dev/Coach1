@@ -16,20 +16,42 @@ export function Hero() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: containerRef.current,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 0.5,
-        }
+      let mm = gsap.matchMedia();
+
+      mm.add("(min-width: 1024px)", () => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: containerRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: 0.5,
+          }
+        });
+
+        tl.to('.parallax-bg-1', { y: -100, ease: 'none' }, 0)
+          .to('.parallax-bg-2', { y: -200, ease: 'none' }, 0)
+          .to('.parallax-bg-3', { y: -300, ease: 'none' }, 0)
+          .to('.hero-text-container', { y: 150, opacity: 0, ease: 'none' }, 0)
+          .to('.hero-image-container', { y: -80, opacity: 0.2, ease: 'none' }, 0);
       });
 
-      tl.to('.parallax-bg-1', { y: -100, ease: 'none' }, 0)
-        .to('.parallax-bg-2', { y: -200, ease: 'none' }, 0)
-        .to('.parallax-bg-3', { y: -300, ease: 'none' }, 0)
-        .to('.hero-text-container', { y: 150, opacity: 0, ease: 'none' }, 0)
-        .to('.hero-image-container', { y: -80, opacity: 0.2, ease: 'none' }, 0);
+      mm.add("(max-width: 1023px)", () => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: containerRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: 0.5,
+          }
+        });
+        
+        // On mobile, just fade things out slightly, no crazy translations to avoid overlaps
+        tl.to('.parallax-bg-1', { y: -50, ease: 'none' }, 0)
+          .to('.parallax-bg-2', { y: -100, ease: 'none' }, 0)
+          .to('.hero-text-container', { opacity: 0, ease: 'none' }, 0)
+          .to('.hero-image-container', { opacity: 0.3, ease: 'none' }, 0);
+      });
+
     }, containerRef);
 
     return () => ctx.revert();
