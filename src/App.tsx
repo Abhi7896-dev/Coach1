@@ -9,7 +9,6 @@ import { AboutUs } from '@/components/AboutUs';
 import { CallToAction } from '@/components/CallToAction';
 import { Footer } from '@/components/Footer';
 import { useReveal } from '@/hooks/useReveal';
-import { ReactLenis } from '@studio-freight/react-lenis';
 import gsap from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 
@@ -19,22 +18,20 @@ function App() {
   const ref = useReveal<HTMLDivElement>();
 
   return (
-    <ReactLenis root options={{ lerp: 0.05, smoothWheel: true }}>
-      <div ref={ref} className="min-h-screen bg-white">
-        <Navbar />
-        <main>
-          <Hero />
-          <CategoryStrip />
-          <ForCoaches />
-          <ForParents />
-          <Community />
-          <AboutUs />
-          <Security />
-          <CallToAction />
-        </main>
-        <Footer />
-      </div>
-    </ReactLenis>
+    <div ref={ref} className="min-h-screen bg-white">
+      <Navbar />
+      <main>
+        <Hero />
+        <CategoryStrip />
+        <ForCoaches />
+        <ForParents />
+        <Community />
+        <AboutUs />
+        <Security />
+        <CallToAction />
+      </main>
+      <Footer />
+    </div>
   );
 }
 

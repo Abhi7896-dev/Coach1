@@ -61,14 +61,10 @@ export function Hero() {
     <section ref={containerRef} id="top" className="relative overflow-hidden bg-ink-950 text-white">
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 grid-bg opacity-[0.18]" />
-        <motion.div 
-          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.4, 0.3] }} 
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        <div 
           className="parallax-bg-1 absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-orange-600/30 blur-[120px]" 
         />
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.3, 0.2] }} 
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        <div 
           className="parallax-bg-2 absolute -right-32 top-20 h-[500px] w-[500px] rounded-full bg-blue-600/30 blur-[120px]" 
         />
         <div className="parallax-bg-3 absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full bg-green-500/15 blur-[120px]" />
