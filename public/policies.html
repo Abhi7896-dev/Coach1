@@ -111,11 +111,13 @@
             <div class="text-ink-800 leading-relaxed text-lg">
                 <h3>1.1 Data We Collect</h3>
                 <ul>
-                    <li><strong>User & Coach Profiles:</strong> Full name, mobile phone number, email address, physical address/pincode, academy affiliation, and coaching certifications.</li>
-                    <li><strong>Athletes & Minors:</strong> Athlete name, age, gender, and Parent/Guardian contact details. All data regarding minors is collected strictly with the explicit digital consent of their verified parent or legal guardian.</li>
-                    <li><strong>Payments & Billing:</strong> Gateway order IDs, transaction timestamps, payment status, and bank reference/UTR numbers. (Note: Card numbers, CVVs, and UPI PINs are processed directly by RBI-licensed payment gateways; TruCoach never collects, stores, or handles sensitive payment credentials).</li>
-                    <li><strong>Location & Geolocation:</strong> Precise GPS location and pincodes used exclusively in the foreground for discovering nearby sports academies, batches, and tournaments.</li>
-                    <li><strong>Device Security & Biometrics:</strong> Face ID and fingerprint authentications are processed locally within the device's secure hardware enclave and are never transmitted to or stored on our servers.</li>
+                    <li><strong>User &amp; Coach Profiles:</strong> Full name, mobile phone number, email address, physical address/pincode, academy affiliation, and coaching certifications.</li>
+                    <li><strong>Athletes &amp; Minors:</strong> Athlete name, age, gender, Parent/Guardian contact details, and <strong>student profile photographs</strong> (stored as <code>profileImageUrl</code>). All data regarding minors — including photos — is collected strictly with the explicit digital consent of their verified parent or legal guardian. Minor profile images are never publicly indexed and are access-controlled at the database row level.</li>
+                    <li><strong>Photos, Documents &amp; Media Uploads:</strong> Profile pictures, gallery images, and coaching certification documents uploaded via the app are stored as <code>profile_image_url</code>, <code>gallery_urls</code>, and <code>certification_urls</code>. To enable these uploads, the app requests access to the device <strong>Camera</strong> and <strong>Photo Library</strong> (for capturing or selecting profile pictures and existing documents). The app also requests <strong>Microphone</strong> access for video recording where required (e.g., skill demonstration clips). These permissions are requested at runtime and may be revoked at any time from your device Settings.</li>
+                    <li><strong>Payments &amp; Billing:</strong> Gateway order IDs, transaction timestamps, payment status, and bank reference/UTR numbers. (Note: Card numbers, CVVs, and UPI PINs are processed directly by RBI-licensed payment gateways; TruCoach never collects, stores, or handles sensitive payment credentials).</li>
+                    <li><strong>Location &amp; Geolocation:</strong> Precise GPS location and pincodes used exclusively in the foreground for discovering nearby sports academies, batches, and tournaments. Address search and geocoding queries are routed through the Google Maps Platform (see Sub-processors below).</li>
+                    <li><strong>Push Notification Tokens:</strong> Device push-notification tokens are collected and linked to your signed-in user ID for delivery of transactional app alerts (attendance, billing reminders, and schedule updates) via OneSignal. Behavioural tags may be attached to route relevant notifications. You may opt out at any time from your device Notification Settings.</li>
+                    <li><strong>Device Security &amp; Biometrics:</strong> Face ID and fingerprint authentications are processed locally within the device's secure hardware enclave and are never transmitted to or stored on our servers.</li>
                 </ul>
 
                 <h3>1.2 Purpose & Use of Data</h3>
@@ -131,10 +133,14 @@
                 <ul>
                     <li><strong>Zero Commercial Sale:</strong> TruCoach has not signed, and will never sign, any agreement to sell, rent, monetize, or share student, parent, or coach data with third-party advertisers, data brokers, or marketing agencies.</li>
                     <li><strong>No Commercial Behavioural Ads:</strong> The platform does not serve commercial third-party ads. Minor profiles are strictly private and shielded from public web crawlers.</li>
-                    <li><strong>Authorized Infrastructure Sub-processors:</strong> Data is processed solely through enterprise compliance partners:
+                    <li><strong>Authorized Infrastructure Sub-processors:</strong> Data is processed solely through the following enterprise compliance partners:
                         <ul class="mt-2">
-                            <li><strong>Cashfree Payments:</strong> For processing secure UPI/card payment sessions and split settlements.</li>
-                            <li><strong>Meta (WhatsApp Cloud API):</strong> For server-side delivery of transactional attendance, emergency billing notices, and official payment receipts.</li>
+                            <li><strong>EaseBuzz (Payment Gateway):</strong> All student fee transactions are processed via EaseBuzz using sub-merchant split-settlement accounts. Your payment data, including UPI / card session tokens and settlement instructions, is shared with EaseBuzz, our sole RBI-licensed payment aggregator.</li>
+                            <li><strong>MSG91 (OTP &amp; SMS Provider):</strong> Every registered phone number is shared with MSG91 solely to deliver one-time password (OTP) codes for login and account verification. MSG91 does not retain phone numbers beyond message delivery as per their data-retention policy.</li>
+                            <li><strong>Google Maps Platform:</strong> Address autocomplete, geocoding, and reverse-geocoding queries (used for academy and batch location discovery) are routed through Google's Maps / Places APIs via a server-side proxy. Location search queries may be associated with your session for the purpose of returning relevant results.</li>
+                            <li><strong>OneSignal (Push Notifications):</strong> Device push-notification tokens and your signed-in user ID are shared with OneSignal to deliver transactional in-app alerts. Behavioural tags (e.g., user role, academy membership) may be registered on OneSignal to route relevant notifications. OneSignal's privacy policy is available at <a href="https://onesignal.com/privacy_policy" class="text-orange-600 hover:text-orange-700" target="_blank" rel="noopener">onesignal.com/privacy_policy</a>.</li>
+                            <li><strong>Resend / Transactional Email:</strong> Your email address may be shared with Resend.com's email API (or Google SMTP depending on configuration) solely to deliver OTP codes, payment receipts, and admin operational alerts. No marketing emails are sent via this channel.</li>
+                            <li><strong>Meta (WhatsApp Cloud API):</strong> For server-side delivery of transactional attendance alerts, emergency billing notices, and official payment receipts.</li>
                             <li><strong>Supabase / Cloud Infrastructure:</strong> Encrypted cloud database storage with PostgreSQL Row-Level Security (RLS) and TLS 1.3 encryption.</li>
                         </ul>
                     </li>
@@ -145,6 +151,9 @@
 
                 <h3>1.5 Data Retention & Account Deletion Rights (Apple Guideline 5.1.1(v) & DPDP Act 2023)</h3>
                 <p>Users have the absolute right to review, update, export, or permanently delete their account and associated student records. In-app account deletion can be initiated at any time directly from the <strong>Profile & Settings</strong> screen with multi-channel verification or by contacting <a href="mailto:support@trucoach.in" class="text-orange-600 hover:text-orange-700">support@trucoach.in</a>.</p>
+                
+                <h3>1.6 Payment Gateway Disclosure (RBI Guidelines for Payment Aggregators)</h3>
+                <p>In compliance with RBI guidelines requiring disclosure of all payment aggregators through which user funds are routed, TruCoach processes all payments exclusively through <strong>EaseBuzz</strong>, our sole RBI-licensed Payment Aggregator, using a sub-merchant split-settlement model. EaseBuzz is independently PCI-DSS compliant. Sensitive card/UPI credentials are processed exclusively within EaseBuzz's secure environment and are never transmitted to or stored on TruCoach servers.</p>
             </div>
         </section>
 
@@ -181,17 +190,17 @@
 
                 <h3>3.4 Payments & Zero-Custody Escrow Model</h3>
                 <ul>
-                    <li><strong>Direct P2B Settlement:</strong> Tuition fees paid by parents are settled directly to the designated academy/coach merchant bank account via payment aggregators (e.g. Cashfree Easy Split). TruCoach maintains a zero-custody model and does not hold or pool student tuition funds in platform escrow.</li>
+                    <li><strong>Direct P2B Settlement:</strong> Tuition fees paid by parents are settled directly to the designated academy/coach merchant bank account via EaseBuzz sub-merchant split-settlement. TruCoach maintains a zero-custody model and does not hold or pool student tuition funds in platform escrow.</li>
                     <li><strong>GST & Tax Compliance:</strong> Academies are solely responsible for calculating and remitting applicable Goods and Services Tax (GST) on coaching fees. Standard 18% GST applies to SaaS software subscription invoices issued by TruCoach.</li>
                 </ul>
 
 
                 <h3>3.5 Payments, In-App Purchases & Zero-Custody Escrow Model</h3>
                 <ul>
-                    <li><strong>Physical Services & In-App Purchase (IAP) Policy (Apple Guideline 3.1.3(e) & 3.1.5(a)):</strong> 
-                        Payments made on TruCoach (including monthly academy tuition, trial match fees, and community sports tournament registrations) are strictly for <strong>real-world, in-person physical coaching and sports facility training consumed outside the digital application</strong>. In accordance with Apple App Store Review Guidelines (3.1.3(e) Goods and Services Outside of the App), these physical services are processed via secure external payment gateways (such as Cashfree UPI, Net Banking, and Cards) rather than Apple In-App Purchase (IAP).
+                    <li><strong>Physical Services &amp; In-App Purchase (IAP) Policy (Apple Guideline 3.1.3(e) &amp; 3.1.5(a)):</strong> 
+                        Payments made on TruCoach (including monthly academy tuition, trial match fees, and community sports tournament registrations) are strictly for <strong>real-world, in-person physical coaching and sports facility training consumed outside the digital application</strong>. In accordance with Apple App Store Review Guidelines (3.1.3(e) Goods and Services Outside of the App), these physical services are processed via EaseBuzz (UPI, Net Banking, and Cards) rather than Apple In-App Purchase (IAP).
                     </li>
-                    <li><strong>Direct P2B Settlement:</strong> Tuition fees paid by parents are settled directly to the designated academy/coach merchant account via payment aggregators (e.g. Cashfree Easy Split). TruCoach maintains a zero-custody model and does not hold or pool student tuition funds in escrow.</li>
+                    <li><strong>Direct P2B Settlement:</strong> Tuition fees paid by parents are settled directly to the designated academy/coach merchant account via EaseBuzz sub-merchant split-settlement. TruCoach maintains a zero-custody model and does not hold or pool student tuition funds in escrow.</li>
                     <li><strong>GST & Tax Compliance:</strong> Academies are solely responsible for calculating and remitting applicable Goods and Services Tax (GST) on coaching fees. Standard 18% GST applies to SaaS software subscription invoices issued by TruCoach.</li>
                 </ul>
 
