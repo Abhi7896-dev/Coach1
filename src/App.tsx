@@ -1,37 +1,36 @@
-import { Navbar } from '@/components/Navbar';
-import { Hero } from '@/components/Hero';
-import { CategoryStrip } from '@/components/CategoryStrip';
-import { ForCoaches } from '@/components/ForCoaches';
-import { ForParents } from '@/components/ForParents';
-import { Community } from '@/components/Community';
-import { Security } from '@/components/Security';
-import { AboutUs } from '@/components/AboutUs';
-import { CallToAction } from '@/components/CallToAction';
-import { Footer } from '@/components/Footer';
-import { useReveal } from '@/hooks/useReveal';
-import gsap from 'gsap';
-import ScrollTrigger from 'gsap/ScrollTrigger';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Home } from '@/pages/Home';
+import { DeleteAccount } from '@/pages/DeleteAccount';
 
-gsap.registerPlugin(ScrollTrigger);
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo(0, 0);
+    } else {
+      const element = document.querySelector(hash);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [pathname, hash]);
+
+  return null;
+}
 
 function App() {
-  const ref = useReveal<HTMLDivElement>();
-
   return (
-    <div ref={ref} className="min-h-screen bg-white">
-      <Navbar />
-      <main>
-        <Hero />
-        <CategoryStrip />
-        <ForCoaches />
-        <ForParents />
-        <Community />
-        <AboutUs />
-        <Security />
-        <CallToAction />
-      </main>
-      <Footer />
-    </div>
+    <BrowserRouter>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/delete-account" element={<DeleteAccount />} />
+        <Route path="/delete-account.html" element={<DeleteAccount />} />
+        <Route path="*" element={<Home />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

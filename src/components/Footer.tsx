@@ -1,5 +1,6 @@
 import { Logo } from './Logo';
 import { Zap, Twitter, Instagram, Linkedin, Youtube } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const COLS = [
   {
@@ -26,6 +27,7 @@ const COLS = [
       { label: 'About Us', href: '#about' },
       { label: 'Security', href: '#security' },
       { label: 'Contact', href: '/policies.html#contact' },
+      { label: 'Delete Account', href: '/delete-account' },
     ],
   },
 ];
@@ -68,12 +70,21 @@ export function Footer() {
               <ul className="mt-4 space-y-3">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-sm text-ink-500 transition-colors hover:text-ink-900"
-                    >
-                      {link.label}
-                    </a>
+                    {link.href.startsWith('/') && !link.href.endsWith('.html') ? (
+                      <Link
+                        to={link.href}
+                        className="text-sm text-ink-500 transition-colors hover:text-ink-900"
+                      >
+                        {link.label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={link.href}
+                        className="text-sm text-ink-500 transition-colors hover:text-ink-900"
+                      >
+                        {link.label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -107,6 +118,7 @@ export function Footer() {
             <a href="/policies.html#privacy" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Privacy Policy</a>
             <a href="/policies.html#terms" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Terms of Service</a>
             <a href="/policies.html#refunds" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Refund Policy</a>
+            <Link to="/delete-account" className="hover:text-orange-600 font-medium">Delete Account</Link>
             <span className="inline-flex items-center gap-1.5">
               <Zap className="h-3.5 w-3.5 text-orange-500" />
               Built for Champions.
