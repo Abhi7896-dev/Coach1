@@ -53,7 +53,7 @@ Thank you.`;
     },
     {
       q: 'How long does a manual email deletion request take?',
-      a: 'If you request deletion via email to support@trucoach.in, our compliance team will authenticate your account ownership and process the deletion within 2-4 business days.',
+      a: 'If you request deletion via email to support@trucoach.co.in, our compliance team will authenticate your account ownership and process the deletion within 2-4 business days.',
     },
     {
       q: 'What happens to my child’s academy attendance and fee records?',
@@ -65,7 +65,7 @@ Thank you.`;
     },
     {
       q: 'Who can I contact for privacy grievances or compliance questions?',
-      a: 'You can contact our Data Privacy & Grievance Officer directly at support@trucoach.in for any questions regarding DPDP Act 2023, Google Play Data Safety, or App Store compliance.',
+      a: 'You can contact our Data Privacy & Grievance Officer directly at support@trucoach.co.in for any questions regarding DPDP Act 2023, Google Play Data Safety, or App Store compliance.',
     },
   ];
 
@@ -331,10 +331,10 @@ Thank you.`;
                 <div className="mt-1 flex items-center gap-2">
                   <Mail className="h-5 w-5 text-ink-400" />
                   <a
-                    href="mailto:support@trucoach.in"
+                    href="mailto:support@trucoach.co.in"
                     className="font-display text-xl sm:text-2xl font-bold text-ink-950 hover:text-orange-600 transition-colors"
                   >
-                    support@trucoach.in
+                    support@trucoach.co.in
                   </a>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-ink-500">
@@ -345,7 +345,7 @@ Thank you.`;
 
               <div className="flex flex-wrap items-center gap-3">
                 <a
-                  href="mailto:support@trucoach.in?subject=TruCoach%20Account%20Deletion%20Request&body=Hi%20TruCoach%20Support%2C%0A%0AI%20would%20like%20to%20request%20the%20permanent%20deletion%20of%20my%20TruCoach%20account%20and%20associated%20personal%20data.%0A%0AMy%20Registered%20Details%3A%0A-%20Registered%20Phone%20Number%3A%20%0A-%20Registered%20Email%20Address%3A%20%0A-%20Account%20Role%20(Parent%20%2F%20Coach)%3A%20%0A-%20Reason%20for%20deletion%20(Optional)%3A%20%0A%0APlease%20confirm%20once%20my%20data%20has%20been%20deleted.%0A%0AThank%20you."
+                  href="mailto:support@trucoach.co.in?subject=TruCoach%20Account%20Deletion%20Request&body=Hi%20TruCoach%20Support%2C%0A%0AI%20would%20like%20to%20request%20the%20permanent%20deletion%20of%20my%20TruCoach%20account%20and%20associated%20personal%20data.%0A%0AMy%20Registered%20Details%3A%0A-%20Registered%20Phone%20Number%3A%20%0A-%20Registered%20Email%20Address%3A%20%0A-%20Account%20Role%20(Parent%20%2F%20Coach)%3A%20%0A-%20Reason%20for%20deletion%20(Optional)%3A%20%0A%0APlease%20confirm%20once%20my%20data%20has%20been%20deleted.%0A%0AThank%20you."
                   className="btn-primary !px-5 !py-3 !text-sm"
                 >
                   <Mail className="h-4 w-4" />
@@ -430,7 +430,7 @@ Thank you.`;
               Need assistance or have privacy concerns?
             </h4>
             <p className="mt-1 text-sm text-ink-600">
-              Our Data Privacy &amp; Grievance Officer is available at <span className="font-semibold text-orange-600">support@trucoach.in</span>.
+              Our Data Privacy &amp; Grievance Officer is available at <span className="font-semibold text-orange-600">support@trucoach.co.in</span>.
             </p>
           </div>
           <a
