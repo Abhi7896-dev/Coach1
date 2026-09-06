@@ -27,6 +27,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/delete-account" element={<DeleteAccount />} />
+        <Route path="/delete-account/" element={<DeleteAccount />} />
+        <Route path="/delete-account/index.html" element={<DeleteAccount />} />
         <Route path="/delete-account.html" element={<DeleteAccount />} />
         <Route path="*" element={<Home />} />
       </Routes>
