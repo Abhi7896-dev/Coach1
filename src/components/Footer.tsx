@@ -28,6 +28,7 @@ const COLS = [
       { label: 'Security', href: '#security' },
       { label: 'Contact', href: '/policies.html#contact' },
       { label: 'Delete Account', href: '/delete-account' },
+      { label: 'Admin Console', href: '/login/admin' },
     ],
   },
 ];
@@ -118,7 +119,7 @@ export function Footer() {
             <a href="/policies.html#privacy" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Privacy Policy</a>
             <a href="/policies.html#terms" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Terms of Service</a>
             <a href="/policies.html#refunds" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Refund Policy</a>
-            <Link to="/delete-account" className="hover:text-orange-600 font-medium">Delete Account</Link>
+            <Link to="/delete-account" className="hover:text-orange-600 font-medium">Delete Account</Link>`r`n            <Link to="/login/admin" className="hover:text-orange-600 font-medium">Admin Portal</Link>
             <span className="inline-flex items-center gap-1.5">
               <Zap className="h-3.5 w-3.5 text-orange-500" />
               Built for Champions.
@@ -129,3 +130,4 @@ export function Footer() {
     </footer>
   );
 }
+
