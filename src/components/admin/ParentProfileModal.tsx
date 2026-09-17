@@ -52,8 +52,24 @@ export function ParentProfileModal({
   const [isAddingAthlete, setIsAddingAthlete] = useState(false);
   const [athleteName, setAthleteName] = useState('');
   const [athleteAge, setAthleteAge] = useState('10');
-  const [athleteGender, setAthleteGender] = useState('Male');
   const [isSavingAthlete, setIsSavingAthlete] = useState(false);
+
+  // `students` stores date of birth, not a plain age number — approximate a
+  // DOB from the age entered in the form (years-ago from today).
+  const ageToDob = (age: string) => {
+    const years = parseInt(age) || 10;
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - years);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const calculateAge = (dob?: string | null) => {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    if (Number.isNaN(birth.getTime())) return null;
+    const diff = Date.now() - birth.getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  };
 
   useEffect(() => {
     if (parent && isOpen) {
@@ -67,53 +83,86 @@ export function ParentProfileModal({
     const p10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
     try {
-      // 1. Fetch Students matching this parent's phone
+      // 1. Fetch Students matching this parent's phone.
+      // `students` has no guardian_phone column — parent_phone is the only
+      // contact field on this table. Filtering on guardian_phone here used
+      // to make this entire query fail (400), which is why nothing ever
+      // showed up for any parent.
       const { data: sData } = await supabase
         .from('students')
         .select('*')
-        .or(`parent_phone.ilike.%${p10}%,guardian_phone.ilike.%${p10}%`);
+        .ilike('parent_phone', `%${p10}%`);
 
       const students = sData || [];
       setStudentsList(students);
 
       const studentIds = students.map((s) => s.id).filter(Boolean);
 
-      // 2. Fetch Enrollments with Tutor & Batch joins
+      // 2. Fetch Enrollments with Batch (+ its sport) and Tutor joins.
+      // `batches` has no schedule/days/time/sport_name/fee columns — the real
+      // fields are schedule_days/start_time/end_time/monthly_fee, and sport
+      // is a separate `sports` lookup table joined via sport_id.
       if (studentIds.length > 0) {
-        try {
-          const { data: eData } = await supabase
-            .from('enrollments')
-            .select('*, tutors(name, academy_name, sports_offered), batches(title, schedule, days, time, sport_name)')
-            .in('student_id', studentIds);
-          setEnrollmentsList(eData || []);
-        } catch (_) {
+        let enrollments: any[] = [];
+        const { data: eData, error: eError } = await supabase
+          .from('enrollments')
+          .select(
+            '*, tutors(name, academy_name, sports_offered), batches(title, schedule_days, start_time, end_time, monthly_fee, sports(name))'
+          )
+          .in('student_id', studentIds);
+
+        if (eError || !eData) {
           const { data: eFallback } = await supabase
             .from('enrollments')
             .select('*')
             .in('student_id', studentIds);
-          setEnrollmentsList(eFallback || []);
+          enrollments = eFallback || [];
+        } else {
+          enrollments = eData;
         }
+        setEnrollmentsList(enrollments);
 
-        try {
+        // finance_logs has no student_id column — it's keyed by enrollment_id
+        // (and tutor_id). Resolve via the enrollment IDs we just fetched.
+        const enrollmentIds = enrollments.map((e) => e.id).filter(Boolean);
+        if (enrollmentIds.length > 0) {
           const { data: fData } = await supabase
             .from('finance_logs')
             .select('*')
-            .in('student_id', studentIds);
+            .in('enrollment_id', enrollmentIds);
           setFinanceList(fData || []);
-        } catch (_) {}
+        } else {
+          setFinanceList([]);
+        }
       } else {
         setEnrollmentsList([]);
         setFinanceList([]);
       }
 
-      // 3. Fetch Admissions & Free Trials from admission_requests
-      try {
-        const { data: qData } = await supabase
-          .from('admission_requests')
-          .select('*')
-          .or(`parent_phone.ilike.%${p10}%`);
-        setInquiriesList(qData || []);
-      } catch (_) {}
+      // 3. Fetch Admissions & Free Trials from admission_requests, then
+      // resolve the coach/academy name via tutor_id — admission_requests has
+      // no academy_name column of its own.
+      const { data: qData } = await supabase
+        .from('admission_requests')
+        .select('*')
+        .ilike('parent_phone', `%${p10}%`);
+      const inquiries = qData || [];
+
+      const tutorIds = Array.from(new Set(inquiries.map((q: any) => q.tutor_id).filter(Boolean)));
+      let tutorLookup = new Map<string, any>();
+      if (tutorIds.length > 0) {
+        const { data: tutorsForInquiries } = await supabase
+          .from('tutors')
+          .select('id, name, academy_name')
+          .in('id', tutorIds);
+        tutorLookup = new Map((tutorsForInquiries || []).map((t: any) => [t.id, t]));
+      }
+      setInquiriesList(
+        inquiries.map((q: any) => ({
+          ...q,
+          academy_name: tutorLookup.get(q.tutor_id)?.academy_name || 'Unassigned',
+        }))
+      );
     } catch (err) {
       console.error('Error fetching deep parent data:', err);
     } finally {
@@ -130,18 +179,15 @@ export function ParentProfileModal({
       const cleanPhone = parent.phone.replace(/[^0-9]/g, '');
       const p10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
+      // `students` only has: name, dob, guardian_name, parent_phone, tags.
+      // (No age/gender/locality/pincode/status columns exist on this table.)
       const { data, error } = await supabase
         .from('students')
         .insert({
           name: athleteName.trim(),
-          age: parseInt(athleteAge) || 10,
-          gender: athleteGender,
+          dob: ageToDob(athleteAge),
           guardian_name: parent.name,
           parent_phone: p10,
-          guardian_phone: p10,
-          locality: parent.locality || 'Hyderabad',
-          pincode: parent.pincode || '',
-          status: 'active',
         })
         .select()
         .single();
@@ -164,6 +210,15 @@ export function ParentProfileModal({
   if (!isOpen || !parent) return null;
 
   const cleanPhone = (parent.phone || '').replace(/[^0-9]/g, '');
+
+  // finance_logs only carries enrollment_id — resolve back to the athlete's
+  // name via the enrollments + students already loaded for this family.
+  const enrollmentById = new Map(enrollmentsList.map((e: any) => [e.id, e]));
+  const resolveReceiptAthlete = (f: any) => {
+    const enr = f.enrollment_id ? enrollmentById.get(f.enrollment_id) : undefined;
+    const student = enr ? studentsList.find((s) => s.id === enr.student_id) : undefined;
+    return student?.name || 'Athlete';
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
@@ -308,7 +363,7 @@ export function ParentProfileModal({
                         className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 space-y-4"
                       >
                         <h4 className="font-display text-sm font-bold text-white">Register Child into Supabase</h4>
-                        <div className="grid gap-3 sm:grid-cols-3 text-xs">
+                        <div className="grid gap-3 sm:grid-cols-2 text-xs">
                           <div>
                             <label className="text-ink-300 block mb-1">Athlete Full Name</label>
                             <input
@@ -321,7 +376,7 @@ export function ParentProfileModal({
                             />
                           </div>
                           <div>
-                            <label className="text-ink-300 block mb-1">Age</label>
+                            <label className="text-ink-300 block mb-1">Age (Years)</label>
                             <input
                               type="number"
                               required
@@ -329,18 +384,6 @@ export function ParentProfileModal({
                               onChange={(e) => setAthleteAge(e.target.value)}
                               className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
                             />
-                          </div>
-                          <div>
-                            <label className="text-ink-300 block mb-1">Gender</label>
-                            <select
-                              value={athleteGender}
-                              onChange={(e) => setAthleteGender(e.target.value)}
-                              className="w-full rounded-xl border border-white/10 bg-[#141a26] p-2.5 text-white outline-none focus:border-blue-500"
-                            >
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                              <option value="Other">Other</option>
-                            </select>
                           </div>
                         </div>
 
@@ -372,6 +415,7 @@ export function ParentProfileModal({
                   ) : (
                     studentsList.map((student) => {
                       const enrollments = enrollmentsList.filter((e) => e.student_id === student.id);
+                      const age = calculateAge(student.dob);
                       return (
                         <div
                           key={student.id}
@@ -385,9 +429,9 @@ export function ParentProfileModal({
                               <div>
                                 <h3 className="font-display text-lg font-bold text-white">{student.name || 'Athlete'}</h3>
                                 <p className="text-xs text-ink-400">
-                                  {student.age ? `${student.age} Years Old` : 'Age unrecorded'} • {student.gender || 'Gender unrecorded'}
-                                  {student.blood_group ? ` • Blood: ${student.blood_group}` : ''}
+                                  {age !== null ? `${age} Years Old` : 'DOB unrecorded'}
                                 </p>
+                                <p className="mt-0.5 font-mono text-[10px] text-ink-500">ID: {student.id}</p>
                               </div>
                             </div>
 
@@ -404,13 +448,15 @@ export function ParentProfileModal({
                             </div>
 
                             <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3 space-y-1">
-                              <span className="text-ink-400 block text-[10px] uppercase font-bold">Emergency / Medical</span>
+                              <span className="text-ink-400 block text-[10px] uppercase font-bold">Record Details</span>
                               <span className="text-white block">
-                                {student.medical_conditions || student.notes || 'No allergies or conditions reported'}
+                                DOB: {student.dob ? new Date(student.dob).toLocaleDateString() : 'Not recorded'}
                               </span>
-                              {student.emergency_contact && (
-                                <span className="font-mono text-ink-400 block">Emergency: {student.emergency_contact}</span>
-                              )}
+                              <span className="text-ink-300 block">
+                                {Array.isArray(student.tags) && student.tags.length > 0
+                                  ? student.tags.join(', ')
+                                  : 'No tags recorded'}
+                              </span>
                             </div>
                           </div>
 
@@ -436,16 +482,20 @@ export function ParentProfileModal({
                                           {tutor?.academy_name || 'Sports Academy'}
                                         </p>
                                         <p className="text-orange-400 font-medium">
-                                          Batch: {batch?.title || 'General Training'} • {batch?.sport_name || 'Sports'}
+                                          Batch: {batch?.title || 'General Training'} • {batch?.sports?.name || 'Sports'}
                                         </p>
                                         <p className="text-ink-400 text-[11px] mt-0.5">
-                                          Coach: {tutor?.name || 'Assigned Coach'} • {batch?.schedule || batch?.days || 'Weekly'} ({batch?.time || 'Scheduled'})
+                                          Coach: {tutor?.name || 'Assigned Coach'} •{' '}
+                                          {Array.isArray(batch?.schedule_days) && batch.schedule_days.length > 0
+                                            ? batch.schedule_days.join(', ')
+                                            : 'Weekly'}
+                                          {batch?.start_time ? ` (${batch.start_time}${batch.end_time ? ' - ' + batch.end_time : ''})` : ''}
                                         </p>
                                       </div>
 
                                       <div className="text-right self-start sm:self-auto">
                                         <span className="rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400">
-                                          {en.monthly_fee ? `₹${en.monthly_fee}/mo` : 'Tuition Active'}
+                                          {batch?.monthly_fee ? `₹${batch.monthly_fee}/mo` : 'Tuition Active'}
                                         </span>
                                       </div>
                                     </div>
@@ -528,6 +578,7 @@ export function ParentProfileModal({
                         >
                           <div>
                             <p className="font-bold text-white text-sm">Receipt #{f.id.slice(0, 8).toUpperCase()}</p>
+                            <p className="text-orange-400 font-medium">{resolveReceiptAthlete(f)}</p>
                             <p className="text-ink-300">{f.batch_title || 'Sports Tuition Fee'}</p>
                             <p className="text-ink-500 font-mono text-[11px]">Method: {f.payment_method || 'UPI / Cashfree'}</p>
                           </div>

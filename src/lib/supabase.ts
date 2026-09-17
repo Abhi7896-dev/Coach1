@@ -148,10 +148,32 @@ export async function signInAdmin(identifier: string, password: string): Promise
 }
 
 /**
- * Signs out the current admin user.
+ * Signs out the current admin user — and actually tears down the session,
+ * not just the local UI state:
+ *
+ * 1. Closes every open Realtime channel/websocket this client holds (the
+ *    WhatsApp Inbox live-message channel, the unread-count channel, or any
+ *    future one) — otherwise those sockets can outlive the "logged out"
+ *    screen for a moment, still authenticated as this user.
+ * 2. Revokes the session server-side with `scope: 'global'` (explicit, even
+ *    though it's already the client default) — this invalidates the
+ *    refresh token in GoTrue immediately, so it can never be used again to
+ *    mint a new access token, and clears the session out of local storage.
+ *
+ * One honest limitation: a JWT access token is a self-contained, signed,
+ * stateless credential — Supabase (like virtually every JWT-based system)
+ * doesn't check a server-side revocation list on every request, so an
+ * *already-issued* access token that somehow leaked elsewhere stays
+ * cryptographically valid until its own short expiry (Supabase's default is
+ * 1 hour), even after this runs. What this DOES immediately and completely
+ * kill is the ability to get a NEW access token from this session ever
+ * again, and every connection this browser tab itself was holding.
  */
 export async function signOutAdmin(): Promise<void> {
-  await supabase.auth.signOut();
+  try {
+    await supabase.removeAllChannels();
+  } catch (_) {}
+  await supabase.auth.signOut({ scope: 'global' });
 }
 
 /**

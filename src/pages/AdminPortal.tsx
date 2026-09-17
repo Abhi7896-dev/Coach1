@@ -24,10 +24,25 @@ import {
   X,
   Award,
   ShieldCheck,
+  Wallet,
+  Activity,
+  MessageCircle,
+  Send,
+  ArrowUpDown,
+  Hash,
+  UserX,
+  Bot,
 } from 'lucide-react';
 import { supabase, signOutAdmin, getAdminSession, AdminUser } from '@/lib/supabase';
 import { CoachProfileModal } from '@/components/admin/CoachProfileModal';
 import { ParentProfileModal } from '@/components/admin/ParentProfileModal';
+import { GrowthDashboard } from '@/components/admin/GrowthDashboard';
+import { FeeTransactionsDashboard } from '@/components/admin/FeeTransactionsDashboard';
+import { UserActivityDashboard } from '@/components/admin/UserActivityDashboard';
+import { WhatsAppTemplatesDashboard } from '@/components/admin/WhatsAppTemplatesDashboard';
+import { MessageLogsDashboard } from '@/components/admin/MessageLogsDashboard';
+import { AccountDeletionRequestsDashboard } from '@/components/admin/AccountDeletionRequestsDashboard';
+import { WhatsAppBotDashboard } from '@/components/admin/WhatsAppBotDashboard';
 
 export interface CoachItem {
   id: string;
@@ -46,6 +61,8 @@ export interface CoachItem {
   totalStudents: number;
   totalBatches: number;
   createdAt?: string;
+  easebuzzAccountLabel?: string;
+  easebuzzSubMerchantId?: string;
 }
 
 export interface AcademyItem {
@@ -82,6 +99,8 @@ export interface AdmissionQueryItem {
   childAge?: number;
   sportName: string;
   academyName: string;
+  tutorId?: string;
+  coachName: string;
   requestType: 'trial' | 'admission';
   status: 'new' | 'contacted' | 'enrolled' | 'closed';
   createdAt: string;
@@ -105,7 +124,19 @@ export function AdminPortal() {
   const navigate = useNavigate();
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'coaches' | 'academies' | 'parents' | 'admissions' | 'tickets'
+    | 'overview'
+    | 'coaches'
+    | 'academies'
+    | 'parents'
+    | 'growth'
+    | 'finance'
+    | 'activity'
+    | 'whatsapp'
+    | 'messagelogs'
+    | 'deletionrequests'
+    | 'whatsappbot'
+    | 'admissions'
+    | 'tickets'
   >('overview');
 
   const [isLoading, setIsLoading] = useState(true);
@@ -117,11 +148,26 @@ export function AdminPortal() {
   const [parents, setParents] = useState<ParentItem[]>([]);
   const [admissions, setAdmissions] = useState<AdmissionQueryItem[]>([]);
   const [tickets, setTickets] = useState<SupportTicketItem[]>([]);
+  const [financeLogs, setFinanceLogs] = useState<any[]>([]);
+
+  // Lightweight counts for the Overview "Quick Access" tiles — these pages
+  // manage their own full data fetch; here we only need a cheap headline
+  // number, so these are simple count-only queries, not the full dataset.
+  const [whatsappTemplateCount, setWhatsappTemplateCount] = useState<number | null>(null);
+  const [messagesSent7dCount, setMessagesSent7dCount] = useState<number | null>(null);
+  const [deletionRequestsCount, setDeletionRequestsCount] = useState<number | null>(null);
+  const [activeUsersCount, setActiveUsersCount] = useState<number | null>(null);
+  const [activeBotRulesCount, setActiveBotRulesCount] = useState<number | null>(null);
   const [totalStudentsCount, setTotalStudentsCount] = useState(0);
   const [totalBatchesCount, setTotalBatchesCount] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [coachStatusFilter, setCoachStatusFilter] = useState<'all' | 'pending' | 'approved' | 'paused' | 'rejected'>('all');
+
+  // Support Desk filter/sort state
+  const [ticketRoleFilter, setTicketRoleFilter] = useState<'all' | 'coach' | 'parent' | 'other'>('all');
+  const [ticketSortBy, setTicketSortBy] = useState<'date' | 'type'>('date');
+  const [ticketSortDir, setTicketSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Deep Profile Modals State
   const [selectedCoach, setSelectedCoach] = useState<CoachItem | null>(null);
@@ -131,11 +177,13 @@ export function AdminPortal() {
   const [isAddingParent, setIsAddingParent] = useState(false);
   const [regParentName, setRegParentName] = useState('');
   const [regParentPhone, setRegParentPhone] = useState('');
-  const [regParentLocality, setRegParentLocality] = useState('');
   const [regChildName, setRegChildName] = useState('');
   const [regChildAge, setRegChildAge] = useState('10');
-  const [regChildGender, setRegChildGender] = useState('Male');
   const [isSavingParent, setIsSavingParent] = useState(false);
+
+  // Sign-out confirmation
+  const [isConfirmingLogout, setIsConfirmingLogout] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     async function verifySession() {
@@ -147,12 +195,72 @@ export function AdminPortal() {
         }
         setAdminUser(session);
         fetchPlatformData();
+        fetchQuickAccessStats();
       } catch {
         navigate('/login/admin');
       }
     }
     verifySession();
   }, [navigate]);
+
+  // Cheap headline numbers for the Overview "Quick Access" tiles. Each is
+  // independent and allowed to fail on its own (e.g. the activity RPC isn't
+  // set up yet) without blocking the others — falls back to null, rendered
+  // as "—" rather than crashing the page.
+  const fetchQuickAccessStats = async () => {
+    try {
+      const { count } = await supabase
+        .from('whatsapp_templates')
+        .select('template_name', { count: 'exact', head: true });
+      setWhatsappTemplateCount(count ?? null);
+    } catch (_) {
+      setWhatsappTemplateCount(null);
+    }
+
+    try {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const { count } = await supabase
+        .from('automation_logs')
+        .select('id', { count: 'exact', head: true })
+        .gte('sent_at', sevenDaysAgo.toISOString());
+      setMessagesSent7dCount(count ?? null);
+    } catch (_) {
+      setMessagesSent7dCount(null);
+    }
+
+    try {
+      const { count } = await supabase
+        .from('account_deletion_logs')
+        .select('*', { count: 'exact', head: true });
+      setDeletionRequestsCount(count ?? null);
+    } catch (_) {
+      setDeletionRequestsCount(null);
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('get_user_activity');
+      if (error || !data) throw error || new Error('no data');
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const active = data.filter(
+        (u: any) => u.last_sign_in_at && new Date(u.last_sign_in_at) >= cutoff
+      ).length;
+      setActiveUsersCount(active);
+    } catch (_) {
+      setActiveUsersCount(null);
+    }
+
+    try {
+      const { count } = await supabase
+        .from('whatsapp_bot_rules')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      setActiveBotRulesCount(count ?? null);
+    } catch (_) {
+      setActiveBotRulesCount(null);
+    }
+  };
 
   const fetchPlatformData = async () => {
     setIsRefreshing(true);
@@ -168,35 +276,49 @@ export function AdminPortal() {
         }
       } catch (_) {}
 
-      // 2. Safe independent queries with Promise.allSettled
-      const [
-        tutorsRes,
-        profilesRes,
-        academiesRes,
-        studentsRes,
-        batchesRes,
-        enrollmentsRes,
-        requestsRes,
-        ticketsRes,
-      ] = await Promise.allSettled([
-        supabase.from('tutors').select('*'),
-        supabase.from('profiles').select('*'),
-        supabase.from('academies').select('*'),
-        supabase.from('students').select('*'),
-        supabase.from('batches').select('*'),
-        supabase.from('enrollments').select('*'),
-        supabase.from('admission_requests').select('*'),
-        supabase.from('support_tickets').select('*'),
-      ]);
+      // 2. Independent queries with Promise.allSettled — but only for
+      // whatever get_platform_directory DIDN'T already give us. Tutors/
+      // profiles/academies/students/batches/enrollments all come back from
+      // that edge function on the happy path, so re-fetching them here too
+      // used to double every one of those 6 queries on every single load —
+      // a real, avoidable spike in concurrent connections against the pool.
+      // admission_requests/support_tickets/finance_logs aren't part of that
+      // edge function's response, so those three always need a direct fetch.
+      const needsFallback = !edgeData;
+      const fallbackEntries: [string, any][] = needsFallback
+        ? [
+            ['tutors', supabase.from('tutors').select('*')],
+            ['profiles', supabase.from('profiles').select('*')],
+            ['academies', supabase.from('academies').select('*')],
+            ['students', supabase.from('students').select('*')],
+            ['batches', supabase.from('batches').select('*')],
+            ['enrollments', supabase.from('enrollments').select('*')],
+          ]
+        : [];
+      const alwaysEntries: [string, any][] = [
+        ['requests', supabase.from('admission_requests').select('*')],
+        ['tickets', supabase.from('support_tickets').select('*')],
+        // Platform-wide fee transactions — keyed by tutor_id, not student_id.
+        ['finance', supabase.from('finance_logs').select('*').order('created_at', { ascending: false })],
+      ];
+      const allEntries = [...fallbackEntries, ...alwaysEntries];
 
-      const tutorsData = edgeData?.tutors || (tutorsRes.status === 'fulfilled' ? tutorsRes.value.data || [] : []);
-      const profilesData = edgeData?.profiles || (profilesRes.status === 'fulfilled' ? profilesRes.value.data || [] : []);
-      const academiesData = edgeData?.academies || (academiesRes.status === 'fulfilled' ? academiesRes.value.data || [] : []);
-      const studentsData = edgeData?.students || (studentsRes.status === 'fulfilled' ? studentsRes.value.data || [] : []);
-      const batchesData = edgeData?.batches || (batchesRes.status === 'fulfilled' ? batchesRes.value.data || [] : []);
-      const enrollmentsData = edgeData?.enrollments || (enrollmentsRes.status === 'fulfilled' ? enrollmentsRes.value.data || [] : []);
-      const requestsData = requestsRes.status === 'fulfilled' ? requestsRes.value.data || [] : [];
-      const ticketsData = ticketsRes.status === 'fulfilled' ? ticketsRes.value.data || [] : [];
+      const settled = await Promise.allSettled(allEntries.map(([, query]) => query));
+      const byKey: Record<string, any[]> = {};
+      allEntries.forEach(([key], i) => {
+        const result = settled[i];
+        byKey[key] = result.status === 'fulfilled' ? (result as PromiseFulfilledResult<any>).value.data || [] : [];
+      });
+
+      const tutorsData = edgeData?.tutors || byKey.tutors || [];
+      const profilesData = edgeData?.profiles || byKey.profiles || [];
+      const academiesData = edgeData?.academies || byKey.academies || [];
+      const studentsData = edgeData?.students || byKey.students || [];
+      const batchesData = edgeData?.batches || byKey.batches || [];
+      const enrollmentsData = edgeData?.enrollments || byKey.enrollments || [];
+      const requestsData = byKey.requests || [];
+      const ticketsData = byKey.tickets || [];
+      const financeData = byKey.finance || [];
 
       const academiesMap = new Map<string, string>();
       if (academiesData) {
@@ -292,6 +414,8 @@ export function AdminPortal() {
               totalStudents: enrollmentsByTutor.get(id) || 0,
               totalBatches: batchesByTutor.get(id) || 0,
               createdAt: t.created_at || existing?.createdAt,
+              easebuzzAccountLabel: t.easebuzz_account_label || existing?.easebuzzAccountLabel || '',
+              easebuzzSubMerchantId: t.easebuzz_sub_merchant_id || existing?.easebuzzSubMerchantId || '',
             });
           }
         });
@@ -343,6 +467,20 @@ export function AdminPortal() {
       // b) students grouped by 10-digit parent/guardian phone
       // NEVER mixes with coaches or academies!
       // ─────────────────────────────────────────────────────────────
+      // Coaches/mobile app often leave the guardian name field on a student
+      // record as a generic placeholder ("Parent", "Guardian", "N/A", etc.)
+      // instead of the real name. Treat those as "no name" so we fall back
+      // to something more useful instead of displaying the placeholder.
+      const GENERIC_NAME_PLACEHOLDERS = new Set([
+        '', 'parent', 'guardian', 'parent/guardian', 'guardian/parent',
+        'n/a', 'na', '-', 'unknown', 'test',
+      ]);
+      const realName = (value: unknown): string | null => {
+        const trimmed = typeof value === 'string' ? value.trim() : '';
+        if (!trimmed) return null;
+        return GENERIC_NAME_PLACEHOLDERS.has(trimmed.toLowerCase()) ? null : trimmed;
+      };
+
       const parentItemsMap = new Map<string, ParentItem>();
 
       // Group students by normalized 10-digit parent phone
@@ -372,9 +510,15 @@ export function AdminPortal() {
             if (p10) {
               const matchedStudents = studentsByPhone.get(p10) || [];
               const childrenNames = matchedStudents.map((s: any) => s.name || 'Athlete');
+              const childName = realName(matchedStudents[0]?.name);
+              const fallbackName = childName ? 'Parent of ' + childName : 'Parent · ' + p10;
               parentItemsMap.set(p10, {
                 id: p.id || 'parent_' + p10,
-                name: p.full_name || p.name || (matchedStudents[0]?.guardian_name) || 'Parent',
+                name:
+                  realName(p.full_name) ||
+                  realName(p.name) ||
+                  realName(matchedStudents[0]?.guardian_name) ||
+                  fallbackName,
                 phone: p10,
                 email: p.email,
                 locality: p.locality || '',
@@ -392,7 +536,8 @@ export function AdminPortal() {
       studentsByPhone.forEach((matchedStudents, p10) => {
         if (!parentItemsMap.has(p10)) {
           const first = matchedStudents[0];
-          const guardianName = first.guardian_name || ('Parent of ' + (first.name || 'Athlete'));
+          const guardianName =
+            realName(first.guardian_name) || 'Parent of ' + (realName(first.name) || 'Athlete');
           const childrenNames = matchedStudents.map((s: any) => s.name || 'Athlete');
           parentItemsMap.set(p10, {
             id: first.id || 'parent_' + p10,
@@ -414,18 +559,27 @@ export function AdminPortal() {
       // ─────────────────────────────────────────────────────────────
       if (requestsData) {
         setAdmissions(
-          requestsData.map((q: any) => ({
-            id: q.id,
-            parentName: q.parent_name || 'Parent',
-            parentPhone: q.parent_phone || '',
-            childName: q.child_name || 'Athlete',
-            childAge: q.child_age,
-            sportName: q.sport_name || 'General',
-            academyName: q.academy_name || 'Academy',
-            requestType: (q.request_type || 'trial').toLowerCase().includes('trial') ? 'trial' : 'admission',
-            status: q.status || 'new',
-            createdAt: q.created_at,
-          }))
+          requestsData.map((q: any) => {
+            // `admission_requests` has no academy_name/academy_id column — the
+            // only link to a coach/academy is `tutor_id`. Resolve the real
+            // academy + coach name via the coach directory built above,
+            // instead of reading a field that doesn't exist on this table.
+            const linkedCoach = q.tutor_id ? coachMap.get(q.tutor_id) : undefined;
+            return {
+              id: q.id,
+              parentName: q.parent_name || 'Parent',
+              parentPhone: q.parent_phone || '',
+              childName: q.child_name || 'Athlete',
+              childAge: q.child_age,
+              sportName: q.sport_name || 'General',
+              academyName: linkedCoach?.academyName || 'Unassigned',
+              tutorId: q.tutor_id,
+              coachName: linkedCoach?.name || 'Unassigned Coach',
+              requestType: (q.request_type || 'trial').toLowerCase().includes('trial') ? 'trial' : 'admission',
+              status: q.status || 'new',
+              createdAt: q.created_at,
+            };
+          })
         );
       }
 
@@ -439,7 +593,10 @@ export function AdminPortal() {
             userName: t.user_name || 'User',
             userPhone: t.user_phone || '',
             userEmail: t.user_email,
-            role: t.role || 'coach',
+            // support_tickets has no `role` column — the real one is
+            // `user_role`. Reading the wrong field silently mislabeled
+            // every ticket as "coach", parent tickets included.
+            role: (t.user_role || 'other').toLowerCase(),
             category: t.category || 'General',
             subject: t.subject || 'Support Query',
             message: t.message || '',
@@ -449,6 +606,11 @@ export function AdminPortal() {
           }))
         );
       }
+
+      // ─────────────────────────────────────────────────────────────
+      // 6. FEE TRANSACTIONS (platform-wide, keyed by tutor_id)
+      // ─────────────────────────────────────────────────────────────
+      setFinanceLogs(financeData || []);
     } catch (err: any) {
       console.error('Error fetching platform admin data:', err);
       showNotice('error', 'Notice: ' + (err?.message || 'Check database permissions'));
@@ -486,6 +648,63 @@ export function AdminPortal() {
     }
   };
 
+  const handleUpdateCoachEasebuzz = async (
+    coachId: string,
+    accountLabel: string,
+    subMerchantId: string
+  ) => {
+    const res = await supabase.functions.invoke('admin-operations', {
+      body: {
+        action: 'update_coach_split',
+        coach_id: coachId,
+        account_label: accountLabel,
+        sub_merchant_id: subMerchantId,
+      },
+    });
+
+    if (res.error || !res.data?.success) {
+      const message = res.data?.error || res.error?.message || 'Failed to save Easebuzz settlement details';
+      showNotice('error', message);
+      throw new Error(message);
+    }
+
+    setCoaches((prev) =>
+      prev.map((c) =>
+        c.id === coachId
+          ? { ...c, easebuzzAccountLabel: accountLabel, easebuzzSubMerchantId: subMerchantId }
+          : c
+      )
+    );
+    if (selectedCoach && selectedCoach.id === coachId) {
+      setSelectedCoach({ ...selectedCoach, easebuzzAccountLabel: accountLabel, easebuzzSubMerchantId: subMerchantId });
+    }
+
+    showNotice('success', 'Easebuzz settlement details saved for this coach.');
+  };
+
+  const handleUpdateCoachRole = async (coachId: string, newRole: string) => {
+    const res = await supabase.functions.invoke('admin-operations', {
+      body: {
+        action: 'update_coach_profile',
+        coach_id: coachId,
+        role: newRole,
+      },
+    });
+
+    if (res.error || !res.data?.success) {
+      const message = res.data?.error || res.error?.message || 'Failed to update coach role';
+      showNotice('error', message);
+      throw new Error(message);
+    }
+
+    setCoaches((prev) => prev.map((c) => (c.id === coachId ? { ...c, role: newRole } : c)));
+    if (selectedCoach && selectedCoach.id === coachId) {
+      setSelectedCoach({ ...selectedCoach, role: newRole });
+    }
+
+    showNotice('success', `Coach role updated to "${newRole === 'independent' ? 'Individual Coach' : 'Academy Coach'}".`);
+  };
+
   const handleUpdateTicketStatus = async (ticketId: string, newStatus: 'in_progress' | 'resolved') => {
     try {
       await supabase.from('support_tickets').update({ status: newStatus }).eq('id', ticketId);
@@ -506,18 +725,21 @@ export function AdminPortal() {
     try {
       const clean = regParentPhone.replace(/[^0-9]/g, '');
       const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      const years = parseInt(regChildAge) || 10;
+      const dob = new Date();
+      dob.setFullYear(dob.getFullYear() - years);
 
+      // `students` only has: name, dob, guardian_name, parent_phone, tags.
+      // (No age/gender/guardian_phone/locality/status columns exist on this
+      // table — this insert used to fail outright with a "column does not
+      // exist" error every time this form was submitted.)
       const { data, error } = await supabase
         .from('students')
         .insert({
           name: regChildName.trim(),
-          age: parseInt(regChildAge) || 10,
-          gender: regChildGender,
+          dob: dob.toISOString().slice(0, 10),
           guardian_name: regParentName.trim() || ('Parent of ' + regChildName),
           parent_phone: p10,
-          guardian_phone: p10,
-          locality: regParentLocality.trim() || 'Hyderabad',
-          status: 'active',
         })
         .select()
         .single();
@@ -570,8 +792,12 @@ export function AdminPortal() {
   };
 
   const handleLogout = async () => {
-    await signOutAdmin();
-    navigate('/login/admin');
+    setIsSigningOut(true);
+    try {
+      await signOutAdmin();
+    } finally {
+      navigate('/login/admin');
+    }
   };
 
   const kpis = useMemo(() => {
@@ -631,6 +857,23 @@ export function AdminPortal() {
     );
   }, [parents, searchQuery]);
 
+  const filteredSortedTickets = useMemo(() => {
+    const filtered =
+      ticketRoleFilter === 'all' ? tickets : tickets.filter((t) => t.role === ticketRoleFilter);
+
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (ticketSortBy === 'date') {
+        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else {
+        cmp = a.category.localeCompare(b.category);
+      }
+      return ticketSortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [tickets, ticketRoleFilter, ticketSortBy, ticketSortDir]);
+
   return (
     <div className="min-h-screen bg-[#090c13] font-sans text-white selection:bg-orange-500/30">
       <AnimatePresence>
@@ -678,7 +921,10 @@ export function AdminPortal() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={fetchPlatformData}
+              onClick={() => {
+                fetchPlatformData();
+                fetchQuickAccessStats();
+              }}
               disabled={isRefreshing}
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-ink-200 transition-all hover:bg-white/[0.08] hover:text-white"
             >
@@ -697,7 +943,7 @@ export function AdminPortal() {
             </div>
 
             <button
-              onClick={handleLogout}
+              onClick={() => setIsConfirmingLogout(true)}
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-all hover:bg-rose-500/20 hover:text-white"
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -714,6 +960,13 @@ export function AdminPortal() {
               { id: 'coaches', label: 'Coaches (' + coaches.length + ')', icon: GraduationCap, badge: kpis.pendingCoaches },
               { id: 'academies', label: 'Academies (' + academies.length + ')', icon: Building2, count: academies.length },
               { id: 'parents', label: 'Parents & Athletes (' + parents.length + ')', icon: Users, count: parents.length },
+              { id: 'growth', label: 'New Registrations', icon: TrendingUp },
+              { id: 'finance', label: 'Fee Transactions', icon: Wallet },
+              { id: 'activity', label: 'Active & Passive Users', icon: Activity },
+              { id: 'whatsapp', label: 'WhatsApp Templates', icon: MessageCircle },
+              { id: 'messagelogs', label: 'Message Logs', icon: Send },
+              { id: 'deletionrequests', label: 'Account Deletion Requests', icon: UserX },
+              { id: 'whatsappbot', label: 'Automation Bot', icon: Bot },
               { id: 'admissions', label: 'Admissions & Trials (' + admissions.length + ')', icon: MessageSquare, count: admissions.length },
               { id: 'tickets', label: 'Support Desk (' + tickets.length + ')', icon: HelpCircle, badge: kpis.openTickets },
             ].map((tab) => (
@@ -837,6 +1090,184 @@ export function AdminPortal() {
                 <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
                   <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
                   <span>{tickets.length} Support Tickets</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Access — every other section in the console, one click away */}
+            <div>
+              <h3 className="font-display text-sm font-bold uppercase tracking-wider text-ink-400 mb-3">
+                Quick Access
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div
+                  onClick={() => setActiveTab('growth')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-purple-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">New Registrations</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-purple-500/15 text-purple-400">
+                      <TrendingUp className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">{parents.length}</span>
+                    <span className="text-xs text-ink-400">Total Parents</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-purple-400"></span>
+                    <span>Growth trend &amp; sign-ups over time</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('finance')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-teal-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Fee Transactions</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-teal-500/15 text-teal-400">
+                      <Wallet className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">{financeLogs.length}</span>
+                    <span className="text-xs text-ink-400">Transactions</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-teal-400"></span>
+                    <span>Cashflow &amp; payment method breakdown</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('activity')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-cyan-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Active &amp; Passive Users</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-400">
+                      <Activity className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">
+                      {activeUsersCount !== null ? activeUsersCount : '—'}
+                    </span>
+                    <span className="text-xs text-ink-400">Active (30d)</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-cyan-400"></span>
+                    <span>{activeUsersCount !== null ? 'Signed in within 30 days' : 'Setup pending — see Active Users tab'}</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('tickets')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-sky-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Support Desk</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/15 text-sky-400">
+                      <HelpCircle className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">{tickets.length}</span>
+                    <span className="text-xs text-ink-400">Tickets</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-sky-400"></span>
+                    <span>{kpis.openTickets} Open · Sort &amp; filter by role</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('whatsappbot')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-sky-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Automation Bot</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/15 text-sky-400">
+                      <Bot className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">
+                      {activeBotRulesCount !== null ? activeBotRulesCount : '—'}
+                    </span>
+                    <span className="text-xs text-ink-400">Active Rules</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-sky-400"></span>
+                    <span>Keyword auto-replies for inbound messages</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('whatsapp')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-green-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">WhatsApp Templates</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-green-500/15 text-green-400">
+                      <MessageCircle className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">
+                      {whatsappTemplateCount !== null ? whatsappTemplateCount : '—'}
+                    </span>
+                    <span className="text-xs text-ink-400">Registered</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-green-400"></span>
+                    <span>Templates, variables &amp; demo previews</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('messagelogs')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-indigo-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Message Logs</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-400">
+                      <Send className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">
+                      {messagesSent7dCount !== null ? messagesSent7dCount : '—'}
+                    </span>
+                    <span className="text-xs text-ink-400">Sent (7d)</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-indigo-400"></span>
+                    <span>Delivery history by recipient &amp; type</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('deletionrequests')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-rose-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Deletion Requests</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15 text-rose-400">
+                      <UserX className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">
+                      {deletionRequestsCount !== null ? deletionRequestsCount : '—'}
+                    </span>
+                    <span className="text-xs text-ink-400">Total Requests</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-rose-400"></span>
+                    <span>Review queue &amp; enrollment history</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1357,6 +1788,29 @@ export function AdminPortal() {
           </div>
         )}
 
+        {/* TAB: NEW REGISTRATIONS / GROWTH */}
+        {activeTab === 'growth' && <GrowthDashboard parents={parents} />}
+
+        {/* TAB: FEE TRANSACTIONS */}
+        {activeTab === 'finance' && (
+          <FeeTransactionsDashboard financeLogs={financeLogs} coaches={coaches} />
+        )}
+
+        {/* TAB: ACTIVE & PASSIVE USERS */}
+        {activeTab === 'activity' && <UserActivityDashboard coaches={coaches} parents={parents} />}
+
+        {/* TAB: WHATSAPP TEMPLATES */}
+        {activeTab === 'whatsapp' && <WhatsAppTemplatesDashboard />}
+
+        {/* TAB: MESSAGE LOGS */}
+        {activeTab === 'messagelogs' && <MessageLogsDashboard coaches={coaches} parents={parents} />}
+
+        {/* TAB: ACCOUNT DELETION REQUESTS */}
+        {activeTab === 'deletionrequests' && <AccountDeletionRequestsDashboard />}
+
+
+        {activeTab === 'whatsappbot' && <WhatsAppBotDashboard />}
+
         {/* TAB 5: ADMISSIONS & TRIALS */}
         {activeTab === 'admissions' && (
           <div className="space-y-6">
@@ -1401,6 +1855,7 @@ export function AdminPortal() {
                         <td className="px-6 py-4">
                           <p className="font-bold text-orange-400">{q.sportName}</p>
                           <p className="text-ink-400">{q.academyName}</p>
+                          <p className="text-ink-500">Coach: {q.coachName}</p>
                         </td>
                         <td className="px-6 py-4">
                           <span
@@ -1441,24 +1896,91 @@ export function AdminPortal() {
               </p>
             </div>
 
-            {tickets.length === 0 ? (
+            {/* Role filter + Sort controls */}
+            <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { id: 'all', label: 'All', count: tickets.length },
+                  { id: 'parent', label: 'Parents', count: tickets.filter((t) => t.role === 'parent').length },
+                  { id: 'coach', label: 'Coaches', count: tickets.filter((t) => t.role === 'coach').length },
+                  { id: 'other', label: 'Other', count: tickets.filter((t) => t.role === 'other').length },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setTicketRoleFilter(f.id as any)}
+                    className={'rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ' +
+                      (ticketRoleFilter === f.id
+                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                        : 'bg-white/[0.04] text-ink-300 hover:bg-white/[0.08]')}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+                  {[
+                    { id: 'date', label: 'Date' },
+                    { id: 'type', label: 'Type' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setTicketSortBy(s.id as any)}
+                      className={'rounded-lg px-3 py-1.5 text-xs font-bold transition-all ' +
+                        (ticketSortBy === s.id ? 'bg-blue-600 text-white shadow-md' : 'text-ink-400 hover:bg-white/[0.06]')}
+                    >
+                      Sort by {s.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setTicketSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-ink-300 hover:bg-white/[0.08]"
+                  title={ticketSortDir === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  {ticketSortDir === 'asc' ? 'Oldest / A→Z' : 'Newest / Z→A'}
+                </button>
+              </div>
+            </div>
+
+            {filteredSortedTickets.length === 0 ? (
               <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-16 text-center">
                 <HelpCircle className="mx-auto h-12 w-12 text-ink-500" />
-                <p className="mt-4 text-sm font-bold text-white">Support queue is clear</p>
-                <p className="mt-1 text-xs text-ink-400">No open complaints or inquiries reported.</p>
+                <p className="mt-4 text-sm font-bold text-white">
+                  {tickets.length === 0 ? 'Support queue is clear' : 'No tickets match this filter'}
+                </p>
+                <p className="mt-1 text-xs text-ink-400">
+                  {tickets.length === 0
+                    ? 'No open complaints or inquiries reported.'
+                    : 'Try a different role filter.'}
+                </p>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                {tickets.map((t) => (
+                {filteredSortedTickets.map((t) => (
                   <div
                     key={t.id}
                     className="flex flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur"
                   >
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="rounded bg-orange-500/20 px-2.5 py-0.5 text-[11px] font-bold uppercase text-orange-400">
-                          {t.category}
-                        </span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded bg-orange-500/20 px-2.5 py-0.5 text-[11px] font-bold uppercase text-orange-400">
+                            {t.category}
+                          </span>
+                          <span
+                            className={'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ' +
+                              (t.role === 'parent'
+                                ? 'bg-emerald-500/15 text-emerald-400'
+                                : t.role === 'coach'
+                                ? 'bg-blue-500/15 text-blue-400'
+                                : 'bg-white/10 text-ink-300')}
+                          >
+                            {t.role}
+                          </span>
+                        </div>
                         <span
                           className={'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ' +
                             (t.status === 'open'
@@ -1480,6 +2002,14 @@ export function AdminPortal() {
                         </p>
                         <p>
                           <strong className="text-white">Contact:</strong> {t.userPhone} {t.userEmail ? ' · ' + t.userEmail : ''}
+                        </p>
+                        <p className="flex items-center gap-1.5">
+                          <Hash className="h-3 w-3 text-ink-500" />
+                          <span className="font-mono text-ink-500">{t.id}</span>
+                        </p>
+                        <p>
+                          <strong className="text-white">Raised:</strong>{' '}
+                          {t.createdAt ? new Date(t.createdAt).toLocaleString() : 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -1549,29 +2079,15 @@ export function AdminPortal() {
                     className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-ink-300 block mb-1">Age</label>
-                    <input
-                      type="number"
-                      required
-                      value={regChildAge}
-                      onChange={(e) => setRegChildAge(e.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-ink-300 block mb-1">Gender</label>
-                    <select
-                      value={regChildGender}
-                      onChange={(e) => setRegChildGender(e.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-[#141a26] p-2.5 text-white outline-none focus:border-blue-500"
-                    >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="text-ink-300 block mb-1">Age (Years)</label>
+                  <input
+                    type="number"
+                    required
+                    value={regChildAge}
+                    onChange={(e) => setRegChildAge(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                  />
                 </div>
                 <div>
                   <label className="text-ink-300 block mb-1">Guardian Name</label>
@@ -1592,16 +2108,6 @@ export function AdminPortal() {
                     placeholder="e.g. 9876543210"
                     value={regParentPhone}
                     onChange={(e) => setRegParentPhone(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-ink-300 block mb-1">Locality</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Jubilee Hills, Hyderabad"
-                    value={regParentLocality}
-                    onChange={(e) => setRegParentLocality(e.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
                   />
                 </div>
@@ -1637,6 +2143,8 @@ export function AdminPortal() {
             onClose={() => setSelectedCoach(null)}
             onStatusUpdate={handleUpdateCoachStatus}
             onBatchCreated={fetchPlatformData}
+            onUpdateEasebuzz={handleUpdateCoachEasebuzz}
+            onUpdateRole={handleUpdateCoachRole}
           />
         )}
       </AnimatePresence>
@@ -1650,6 +2158,57 @@ export function AdminPortal() {
             onClose={() => setSelectedParent(null)}
             onStudentAdded={fetchPlatformData}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Sign-out confirmation */}
+      <AnimatePresence>
+        {isConfirmingLogout && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => !isSigningOut && setIsConfirmingLogout(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#0d111a] p-6 shadow-2xl"
+            >
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-500/15 text-rose-400">
+                <LogOut className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 font-display text-lg font-bold text-white">Sign out of Admin Console?</h3>
+              <p className="mt-1.5 text-xs text-ink-400 leading-relaxed">
+                Your session will be revoked immediately and every live connection this tab holds will be closed.
+                You'll need to sign in again to come back.
+              </p>
+              <div className="mt-6 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setIsConfirmingLogout(false)}
+                  disabled={isSigningOut}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-ink-200 transition hover:bg-white/[0.08] disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogout}
+                  disabled={isSigningOut}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-rose-600 disabled:opacity-60"
+                >
+                  {isSigningOut ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <LogOut className="h-3.5 w-3.5" />
+                  )}
+                  <span>{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
