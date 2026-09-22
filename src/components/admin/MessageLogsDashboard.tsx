@@ -63,9 +63,12 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
       start.setDate(start.getDate() - days);
 
       const LIMIT = 2000;
+      // Embeds the student via automation_logs' existing student_id FK
+      // instead of a separate lookup query afterward keyed off the IDs from
+      // this result — one round trip instead of two, chained.
       const { data, error, count } = await supabase
         .from('automation_logs')
-        .select('id, recipient_phone, message_type, sent_at, tutor_id, student_id, status', { count: 'exact' })
+        .select('id, recipient_phone, message_type, sent_at, tutor_id, student_id, status, students(id, name, guardian_name)', { count: 'exact' })
         .gte('sent_at', start.toISOString())
         .order('sent_at', { ascending: false })
         .limit(LIMIT);
@@ -79,17 +82,7 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
       const rows = data || [];
       setLogs(rows);
       setTruncated((count || 0) > rows.length);
-
-      const studentIds = Array.from(new Set(rows.map((r) => r.student_id).filter(Boolean))) as string[];
-      if (studentIds.length > 0) {
-        const { data: sData } = await supabase
-          .from('students')
-          .select('id, name, guardian_name')
-          .in('id', studentIds);
-        setStudentMap(new Map((sData || []).map((s: any) => [s.id, s])));
-      } else {
-        setStudentMap(new Map());
-      }
+      setStudentMap(new Map(rows.filter((r: any) => r.students).map((r: any) => [r.students.id, r.students])));
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to load message logs.');
     } finally {

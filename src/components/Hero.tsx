@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { ArrowRight, MapPin, Star, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { AppStoreIcon } from './AppStoreIcon';
+
+const APP_STORE_URL = 'https://apps.apple.com/in/app/trucoach/id6808904997';
 import { motion, Variants } from 'framer-motion';
 import gsap from 'gsap';
 
@@ -44,7 +47,7 @@ export function Hero() {
             scrub: 0.5,
           }
         });
-        
+
         // On mobile, just fade things out slightly, no crazy translations to avoid overlaps
         tl.to('.parallax-bg-1', { y: -50, ease: 'none' }, 0)
           .to('.parallax-bg-2', { y: -100, ease: 'none' }, 0)
@@ -61,11 +64,11 @@ export function Hero() {
     <section ref={containerRef} id="top" className="relative overflow-hidden bg-ink-950 text-white">
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 grid-bg opacity-[0.18]" />
-        <div 
-          className="parallax-bg-1 absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-orange-600/30 blur-[120px]" 
+        <div
+          className="parallax-bg-1 absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-orange-600/30 blur-[120px]"
         />
-        <div 
-          className="parallax-bg-2 absolute -right-32 top-20 h-[500px] w-[500px] rounded-full bg-blue-600/30 blur-[120px]" 
+        <div
+          className="parallax-bg-2 absolute -right-32 top-20 h-[500px] w-[500px] rounded-full bg-blue-600/30 blur-[120px]"
         />
         <div className="parallax-bg-3 absolute bottom-0 left-1/3 h-[420px] w-[420px] rounded-full bg-green-500/15 blur-[120px]" />
       </div>
@@ -73,7 +76,7 @@ export function Hero() {
       <div className="container-page relative pt-20 pb-16 sm:pt-28 lg:pb-20">
         <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
           {/* Copy */}
-          <motion.div 
+          <motion.div
             initial="hidden"
             animate="visible"
             variants={{
@@ -116,16 +119,21 @@ export function Hero() {
 
             {/* Trust row */}
             <motion.div variants={itemVariants} className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4 text-sm text-ink-300">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 font-medium text-white ring-1 ring-white/20">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-2.5 rounded-full bg-white/10 px-4 py-1.5 font-medium text-white ring-1 ring-white/20 backdrop-blur transition-all duration-200 hover:bg-white/15 hover:ring-white/30 hover:shadow-[0_4px_20px_-4px_rgba(0,122,255,0.4)]"
+              >
+                <AppStoreIcon size={20} className="h-5 w-5 rounded-[5px] shadow-sm transition-transform duration-200 group-hover:scale-110" />
+                <span>
+                  Available on the <span className="font-semibold text-white">App Store</span>
                 </span>
-                Launching Shortly on App Store & Google Play
-              </span>
+                <span className="text-ink-400">· Google Play soon</span>
+              </a>
               <span className="inline-flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-green-400" />
-                OTP &amp; Biometric secured
+                Explore Coaches Securely
               </span>
               <span className="inline-flex items-center gap-2">
                 <Star className="h-4 w-4 text-orange-400" />
@@ -139,7 +147,7 @@ export function Hero() {
           </motion.div>
 
           {/* Visual */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}

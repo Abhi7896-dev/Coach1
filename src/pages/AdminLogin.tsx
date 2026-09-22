@@ -14,8 +14,10 @@ import {
   CheckCircle2,
   Cpu,
   KeyRound,
+  Loader2,
+  MailCheck,
 } from 'lucide-react';
-import { signInAdmin, getAdminSession } from '@/lib/supabase';
+import { signInAdmin, getAdminSession, supabase } from '@/lib/supabase';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -26,6 +28,44 @@ export function AdminLogin() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [existingAdmin, setExistingAdmin] = useState<string | null>(null);
+
+  // ── Forgot Password ────────────────────────────────────────────────────
+  const [isForgotMode, setIsForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      setForgotError('Enter your admin email address.');
+      return;
+    }
+    setForgotError(null);
+    setForgotBusy(true);
+    try {
+      const { error } = await supabase.functions.invoke('admin-password-reset', {
+        body: { action: 'request', email: forgotEmail.trim() },
+      });
+      if (error) throw new Error(error.message);
+      // Deliberately shown regardless of whether the email actually matched
+      // a registered admin account — the edge function itself never
+      // confirms or denies that either.
+      setForgotSent(true);
+    } catch (err: any) {
+      setForgotError(err?.message || 'Failed to send reset link. Please try again.');
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  const resetForgotFlow = () => {
+    setIsForgotMode(false);
+    setForgotEmail('');
+    setForgotSent(false);
+    setForgotError(null);
+  };
 
   // Check if already authenticated as Admin
   useEffect(() => {
@@ -216,6 +256,77 @@ export function AdminLogin() {
             {/* Ambient inner rim glow */}
             <div className="pointer-events-none absolute -top-24 left-1/2 h-36 w-64 -translate-x-1/2 rounded-full bg-orange-500/15 blur-2xl" />
 
+            {isForgotMode ? (
+              forgotSent ? (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-10 text-center">
+                  <MailCheck className="h-9 w-9 text-emerald-400" />
+                  <p className="text-sm font-semibold text-white">Check your email</p>
+                  <p className="text-xs leading-relaxed text-ink-400">
+                    If <span className="font-semibold text-white">{forgotEmail}</span> is a registered platform admin
+                    account, a reset link and verification code have been sent — both valid for 10 minutes.
+                  </p>
+                  <button
+                    onClick={resetForgotFlow}
+                    className="mt-2 rounded-xl bg-white/[0.06] px-4 py-2 text-xs font-bold text-ink-200 hover:bg-white/[0.1]"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-5">
+                  <div className="text-center">
+                    <h2 className="font-display text-lg font-bold text-white">Reset Admin Password</h2>
+                    <p className="mt-1 text-xs text-ink-400">
+                      Enter your admin email — we'll send a reset link and verification code, valid for 10 minutes.
+                    </p>
+                  </div>
+
+                  {forgotError && (
+                    <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs leading-relaxed text-rose-300 backdrop-blur">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                      <span>{forgotError}</span>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ink-300">
+                      Platform Admin Email
+                    </label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-ink-400">
+                        <Mail className="h-4 w-4" />
+                      </div>
+                      <input
+                        type="email"
+                        required
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="admin@trucoach.co.in"
+                        className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3.5 pl-11 pr-4 text-sm text-white placeholder-ink-400 outline-none transition-all focus:border-orange-500/70 focus:bg-white/[0.08] focus:ring-4 focus:ring-orange-500/20"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={forgotBusy}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 py-4 text-sm font-bold text-white shadow-xl shadow-orange-500/25 transition-all hover:shadow-orange-500/40 disabled:opacity-60"
+                  >
+                    {forgotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                    <span>Send Reset Link</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetForgotFlow}
+                    className="flex w-full items-center justify-center gap-1.5 text-xs font-semibold text-ink-400 hover:text-white"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Back to Sign In
+                  </button>
+                </form>
+              )
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Error Shake Alert */}
               <AnimatePresence>
@@ -284,6 +395,15 @@ export function AdminLogin() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotMode(true)}
+                    className="text-xs font-semibold text-orange-400 hover:text-orange-300"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
               </div>
 
               {/* Submit Button */}
@@ -338,6 +458,7 @@ export function AdminLogin() {
                 )}
               </motion.button>
             </form>
+            )}
 
             {/* Bottom Security Footer */}
             <div className="mt-7 border-t border-white/[0.08] pt-5 text-center">

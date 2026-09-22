@@ -71,18 +71,15 @@ export function AccountDeletionRequestsDashboard() {
       // this is equivalent in practice but lets Postgres use
       // idx_students_parent_phone (a leading-wildcard ILIKE can't use a
       // plain btree index and forces a sequential scan).
-      const { data: students } = await supabase.from('students').select('*').eq('parent_phone', p10);
+      // Embeds enrollments (+ tutor/batch/sport) directly via the reverse
+      // student_id FK, instead of a second query chained off the student
+      // IDs from this one.
+      const { data: students } = await supabase
+        .from('students')
+        .select('*, enrollments(*, tutors(name, academy_name), batches(title, sports(name)))')
+        .eq('parent_phone', p10);
       const studentList = students || [];
-      const studentIds = studentList.map((s: any) => s.id).filter(Boolean);
-
-      let enrollments: any[] = [];
-      if (studentIds.length > 0) {
-        const { data: eData } = await supabase
-          .from('enrollments')
-          .select('*, tutors(name, academy_name), batches(title, sports(name))')
-          .in('student_id', studentIds);
-        enrollments = eData || [];
-      }
+      const enrollments = studentList.flatMap((s: any) => s.enrollments || []);
 
       setHistoryCache((prev) => new Map(prev).set(p10, { students: studentList, enrollments }));
     } catch (_) {

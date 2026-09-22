@@ -83,31 +83,43 @@ export function ParentProfileModal({
     const p10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
     try {
-      // 1. Fetch Students matching this parent's phone.
-      // `students` has no guardian_phone column — parent_phone is the only
-      // contact field on this table. Filtering on guardian_phone here used
-      // to make this entire query fail (400), which is why nothing ever
-      // showed up for any parent.
-      const { data: sData } = await supabase
-        .from('students')
-        .select('*')
-        .ilike('parent_phone', `%${p10}%`);
+      // 1 & 2 run concurrently — admission_requests doesn't depend on
+      // students at all, so there's no reason to wait for that query before
+      // starting this one. admission_requests also embeds its tutor
+      // (name, academy_name) directly via the existing tutor_id FK, instead
+      // of a separate tutors lookup + manually-built Map afterward.
+      const [studentsRes, admissionsRes] = await Promise.all([
+        // `students` has no guardian_phone column — parent_phone is the only
+        // contact field on this table. Filtering on guardian_phone here used
+        // to make this entire query fail (400), which is why nothing ever
+        // showed up for any parent.
+        supabase.from('students').select('*').ilike('parent_phone', `%${p10}%`),
+        supabase.from('admission_requests').select('*, tutors(name, academy_name)').ilike('parent_phone', `%${p10}%`),
+      ]);
 
-      const students = sData || [];
+      const students = studentsRes.data || [];
       setStudentsList(students);
 
-      const studentIds = students.map((s) => s.id).filter(Boolean);
+      const inquiries = admissionsRes.data || [];
+      setInquiriesList(
+        inquiries.map((q: any) => ({
+          ...q,
+          academy_name: q.tutors?.academy_name || 'Unassigned',
+        }))
+      );
 
-      // 2. Fetch Enrollments with Batch (+ its sport) and Tutor joins.
-      // `batches` has no schedule/days/time/sport_name/fee columns — the real
-      // fields are schedule_days/start_time/end_time/monthly_fee, and sport
-      // is a separate `sports` lookup table joined via sport_id.
+      // 3. Enrollments, with batch/sport/tutor AND finance_logs all embedded
+      // in the same call via their existing foreign keys — finance_logs used
+      // to be a separate query keyed off enrollment IDs fetched here first;
+      // now it comes back as part of this one request instead of a second
+      // round trip chained after it.
+      const studentIds = students.map((s) => s.id).filter(Boolean);
       if (studentIds.length > 0) {
         let enrollments: any[] = [];
         const { data: eData, error: eError } = await supabase
           .from('enrollments')
           .select(
-            '*, tutors(name, academy_name, sports_offered), batches(title, schedule_days, start_time, end_time, monthly_fee, sports(name))'
+            '*, tutors(name, academy_name, sports_offered), batches(title, schedule_days, start_time, end_time, monthly_fee, sports(name)), finance_logs(*)'
           )
           .in('student_id', studentIds);
 
@@ -121,48 +133,11 @@ export function ParentProfileModal({
           enrollments = eData;
         }
         setEnrollmentsList(enrollments);
-
-        // finance_logs has no student_id column — it's keyed by enrollment_id
-        // (and tutor_id). Resolve via the enrollment IDs we just fetched.
-        const enrollmentIds = enrollments.map((e) => e.id).filter(Boolean);
-        if (enrollmentIds.length > 0) {
-          const { data: fData } = await supabase
-            .from('finance_logs')
-            .select('*')
-            .in('enrollment_id', enrollmentIds);
-          setFinanceList(fData || []);
-        } else {
-          setFinanceList([]);
-        }
+        setFinanceList(enrollments.flatMap((e: any) => e.finance_logs || []));
       } else {
         setEnrollmentsList([]);
         setFinanceList([]);
       }
-
-      // 3. Fetch Admissions & Free Trials from admission_requests, then
-      // resolve the coach/academy name via tutor_id — admission_requests has
-      // no academy_name column of its own.
-      const { data: qData } = await supabase
-        .from('admission_requests')
-        .select('*')
-        .ilike('parent_phone', `%${p10}%`);
-      const inquiries = qData || [];
-
-      const tutorIds = Array.from(new Set(inquiries.map((q: any) => q.tutor_id).filter(Boolean)));
-      let tutorLookup = new Map<string, any>();
-      if (tutorIds.length > 0) {
-        const { data: tutorsForInquiries } = await supabase
-          .from('tutors')
-          .select('id, name, academy_name')
-          .in('id', tutorIds);
-        tutorLookup = new Map((tutorsForInquiries || []).map((t: any) => [t.id, t]));
-      }
-      setInquiriesList(
-        inquiries.map((q: any) => ({
-          ...q,
-          academy_name: tutorLookup.get(q.tutor_id)?.academy_name || 'Unassigned',
-        }))
-      );
     } catch (err) {
       console.error('Error fetching deep parent data:', err);
     } finally {

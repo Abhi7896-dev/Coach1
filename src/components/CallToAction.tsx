@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { ArrowRight, MapPin, GraduationCap, Sparkles, X, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AppStoreIcon } from './AppStoreIcon';
 
 const CTA_IMG =
   'https://images.pexels.com/photos/10347891/pexels-photo-10347891.jpeg?auto=compress&cs=tinysrgb&h=900&w=1400';
+
+const APP_STORE_URL = 'https://apps.apple.com/in/app/trucoach/id6808904997';
+const APP_STORE_QR_SRC = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(APP_STORE_URL)}`;
 
 export function CallToAction() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,13 +74,40 @@ export function CallToAction() {
             </a>
           </div>
 
-          <div className="reveal reveal-delay-4 mt-8 flex flex-col items-center gap-3">
+          <div className="reveal reveal-delay-4 mt-8 flex flex-col items-center gap-5">
+            <div className="flex flex-col items-center gap-4 sm:flex-row">
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-3.5 rounded-2xl bg-white px-5 py-3 text-ink-950 shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_20px_40px_-15px_rgba(0,122,255,0.35)] active:scale-95"
+              >
+                <AppStoreIcon size={38} className="h-9.5 w-9.5 rounded-xl shadow-sm transition-transform duration-300 group-hover:scale-105" />
+                <span className="text-left leading-tight">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink-500">Download on the</span>
+                  <span className="block text-lg font-bold font-display tracking-tight text-ink-950">App Store</span>
+                </span>
+              </a>
+              <div className="group relative">
+                <img
+                  src={APP_STORE_QR_SRC}
+                  alt="Scan to download TruCoach on the App Store"
+                  width={110}
+                  height={110}
+                  className="rounded-2xl border-4 border-white bg-white p-1.5 shadow-xl transition-all duration-300 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute -bottom-2 -right-2 rounded-full bg-blue-600 p-1 text-white shadow-md ring-2 ring-white">
+                  <AppStoreIcon size={14} className="h-3.5 w-3.5" />
+                </div>
+              </div>
+            </div>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white ring-1 ring-white/20 backdrop-blur">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
               </span>
-              Launching Shortly on App Store & Google Play
+              Launching Shortly on Google Play
             </span>
           </div>
         </div>

@@ -132,7 +132,7 @@ serve(async (req) => {
           const value = change.value || {};
 
           // Inbound messages from users — checked against the bot rules
-          // and replied to directly; nothing is persisted anywhere.
+          // and replied to directly; no message content is ever persisted.
           for (const msg of value.messages || []) {
             const body =
               msg.text?.body ??
@@ -140,6 +140,17 @@ serve(async (req) => {
               msg.interactive?.button_reply?.title ??
               msg.interactive?.list_reply?.title ??
               null;
+
+            // Records only "this phone messaged us, most recently at time
+            // X" — no message content — so callers elsewhere can tell
+            // whether a number is still inside Meta's 24h free-form reply
+            // window. Best-effort: a failure here must never block the
+            // bot-reply logic below.
+            try {
+              await recordSessionWindow(supabase, msg.from);
+            } catch (err) {
+              console.error('whatsapp-inbox-webhook: session window record failed', err);
+            }
 
             try {
               await maybeSendAutomatedReply(supabase, msg.from, body);
@@ -164,6 +175,26 @@ serve(async (req) => {
 
   return new Response('Method Not Allowed', { status: 405 });
 });
+
+// Upserts this phone's "last inbound message" timestamp into
+// whatsapp_session_windows, and opportunistically deletes rows older than
+// 24 hours in the same call — no separate cron/trigger needed. Meta's
+// free-form reply window is 24h, so an older row is simply useless; this
+// keeps the table from ever holding more than ~a day of numbers, without
+// storing anything about the messages themselves.
+async function recordSessionWindow(
+  supabase: ReturnType<typeof createClient>,
+  fromPhone: string
+): Promise<void> {
+  if (!fromPhone) return;
+
+  await supabase
+    .from('whatsapp_session_windows')
+    .upsert({ phone: fromPhone, last_message_at: new Date().toISOString() }, { onConflict: 'phone' });
+
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from('whatsapp_session_windows').delete().lt('last_message_at', cutoff);
+}
 
 // A rule's `keyword` field supports multiple comma-separated alternates
 // (e.g. "fees, fee, payment" or "hi, hello, hey") — matches if ANY of them
@@ -192,7 +223,7 @@ async function maybeSendAutomatedReply(
 
   const { data: rules, error } = await supabase
     .from('whatsapp_bot_rules')
-    .select('keyword, match_type, reply_message')
+    .select('keyword, match_type, reply_message, header_type, header_value, footer_text')
     .eq('is_active', true)
     .order('priority', { ascending: false });
 
@@ -231,19 +262,60 @@ async function maybeSendAutomatedReply(
     return;
   }
 
+  const payload = buildReplyPayload(toPhone, matched);
+
   await fetch(`https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${META_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(payload),
+  });
+}
+
+// Composes the actual Meta message payload for a matched rule. WhatsApp's
+// free-form (non-template) messages have no native header/footer
+// component — that's a Template-only feature — so this builds the closest
+// practical equivalent:
+//   - header_type 'image': sends the image itself as the message, with the
+//     reply text (+ footer) as its caption.
+//   - header_type 'text': prepends the header as a bold line.
+//   - header_type 'link': prepends the URL as its own line (Meta
+//     auto-previews it) above the reply text.
+//   - footer_text (any header type): appended as an italic line at the end.
+function buildReplyPayload(
+  toPhone: string,
+  rule: { reply_message: string; header_type?: string | null; header_value?: string | null; footer_text?: string | null }
+): Record<string, unknown> {
+  const headerType = rule.header_type || 'none';
+  const headerValue = (rule.header_value || '').trim();
+  const footer = (rule.footer_text || '').trim();
+
+  const bodyWithFooter = footer ? `${rule.reply_message}\n\n_${footer}_` : rule.reply_message;
+
+  if (headerType === 'image' && headerValue) {
+    return {
       messaging_product: 'whatsapp',
       to: toPhone,
-      type: 'text',
-      text: { body: matched.reply_message },
-    }),
-  });
+      type: 'image',
+      image: { link: headerValue, caption: bodyWithFooter },
+    };
+  }
+
+  let composedBody = bodyWithFooter;
+  if (headerType === 'text' && headerValue) {
+    composedBody = `*${headerValue}*\n\n${bodyWithFooter}`;
+  } else if (headerType === 'link' && headerValue) {
+    composedBody = `${headerValue}\n\n${bodyWithFooter}`;
+  }
+
+  return {
+    messaging_product: 'whatsapp',
+    to: toPhone,
+    type: 'text',
+    text: { body: composedBody, preview_url: true },
+  };
 }
 
 async function verifySignature(body: string, signatureHeader: string, secret: string): Promise<boolean> {

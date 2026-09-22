@@ -4,6 +4,7 @@ import { Home } from '@/pages/Home';
 import { DeleteAccount } from '@/pages/DeleteAccount';
 import { AdminLogin } from '@/pages/AdminLogin';
 import { AdminPortal } from '@/pages/AdminPortal';
+import { AdminResetPassword } from '@/pages/AdminResetPassword';
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -29,6 +30,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login/admin" element={<AdminLogin />} />
+        <Route path="/reset-password/admin" element={<AdminResetPassword />} />
         <Route path="/admin" element={<AdminPortal />} />
         <Route path="/admin/*" element={<AdminPortal />} />
         <Route path="/delete-account" element={<DeleteAccount />} />

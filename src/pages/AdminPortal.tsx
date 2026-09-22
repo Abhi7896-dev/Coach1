@@ -32,6 +32,9 @@ import {
   Hash,
   UserX,
   Bot,
+  CalendarDays,
+  Settings,
+  ShieldAlert,
 } from 'lucide-react';
 import { supabase, signOutAdmin, getAdminSession, AdminUser } from '@/lib/supabase';
 import { CoachProfileModal } from '@/components/admin/CoachProfileModal';
@@ -43,6 +46,10 @@ import { WhatsAppTemplatesDashboard } from '@/components/admin/WhatsAppTemplates
 import { MessageLogsDashboard } from '@/components/admin/MessageLogsDashboard';
 import { AccountDeletionRequestsDashboard } from '@/components/admin/AccountDeletionRequestsDashboard';
 import { WhatsAppBotDashboard } from '@/components/admin/WhatsAppBotDashboard';
+import { CommunityEventsDashboard } from '@/components/admin/CommunityEventsDashboard';
+import { PlatformSettingsDashboard } from '@/components/admin/PlatformSettingsDashboard';
+import { AuthRegistryDashboard } from '@/components/admin/AuthRegistryDashboard';
+import { AdminAccountDashboard } from '@/components/admin/AdminAccountDashboard';
 
 export interface CoachItem {
   id: string;
@@ -120,6 +127,39 @@ export interface SupportTicketItem {
   createdAt: string;
 }
 
+export interface PlatformConfig {
+  id: string;
+  support_email: string | null;
+  whatsapp_support_number: string | null;
+  api_base_url: string | null;
+  max_monthly_community_events: number | null;
+  max_monthly_academy_events: number | null;
+  default_payment_window_start_day: number | null;
+  default_payment_window_end_day: number | null;
+  default_report_window_day: number | null;
+  max_location_changes: number | null;
+  location_change_window_days: number | null;
+  otp_mandatory_for_location: boolean | null;
+  updated_at: string | null;
+}
+
+export interface CommunityEventItem {
+  id: string;
+  tutor_id: string;
+  tutor_name: string;
+  academy_name: string;
+  sport_name: string;
+  title: string;
+  description: string;
+  event_date: string;
+  start_time: string;
+  is_public: boolean;
+  target_batch_ids: string[] | null;
+  booked_count: number;
+  max_capacity: number;
+  created_at: string;
+}
+
 export function AdminPortal() {
   const navigate = useNavigate();
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
@@ -137,6 +177,9 @@ export function AdminPortal() {
     | 'whatsappbot'
     | 'admissions'
     | 'tickets'
+    | 'events'
+    | 'settings'
+    | 'authregistry'
   >('overview');
 
   const [isLoading, setIsLoading] = useState(true);
@@ -149,6 +192,8 @@ export function AdminPortal() {
   const [admissions, setAdmissions] = useState<AdmissionQueryItem[]>([]);
   const [tickets, setTickets] = useState<SupportTicketItem[]>([]);
   const [financeLogs, setFinanceLogs] = useState<any[]>([]);
+  const [platformConfig, setPlatformConfig] = useState<PlatformConfig | null>(null);
+  const [communityEvents, setCommunityEvents] = useState<CommunityEventItem[]>([]);
 
   // Lightweight counts for the Overview "Quick Access" tiles — these pages
   // manage their own full data fetch; here we only need a cheap headline
@@ -194,8 +239,14 @@ export function AdminPortal() {
           return;
         }
         setAdminUser(session);
-        fetchPlatformData();
-        fetchQuickAccessStats();
+        // fetchQuickAccessStats is now only a fallback: fetchPlatformData's
+        // edge-function call already returns these same stats in one round
+        // trip (see the "stats" block in get_platform_directory), so the 5
+        // separate count queries this used to always run are skipped
+        // entirely on the normal/happy path.
+        fetchPlatformData().then((edgeSucceeded) => {
+          if (!edgeSucceeded) fetchQuickAccessStats();
+        });
       } catch {
         navigate('/login/admin');
       }
@@ -262,7 +313,7 @@ export function AdminPortal() {
     }
   };
 
-  const fetchPlatformData = async () => {
+  const fetchPlatformData = async (): Promise<boolean> => {
     setIsRefreshing(true);
     try {
       // 1. Try single-call service-role edge function if available
@@ -319,6 +370,23 @@ export function AdminPortal() {
       const requestsData = byKey.requests || [];
       const ticketsData = byKey.tickets || [];
       const financeData = byKey.finance || [];
+
+      // Quick Access tile counts — comes bundled in the same edge-function
+      // response now, so this replaces what used to be 5 separate round
+      // trips from fetchQuickAccessStats on every load. Only that function
+      // runs its own queries now, and only as a fallback when this edge
+      // call itself failed (edgeData is null) — see the caller.
+      if (edgeData?.stats) {
+        setWhatsappTemplateCount(edgeData.stats.whatsapp_template_count ?? null);
+        setMessagesSent7dCount(edgeData.stats.messages_sent_7d_count ?? null);
+        setDeletionRequestsCount(edgeData.stats.deletion_requests_count ?? null);
+        setActiveUsersCount(edgeData.stats.active_users_30d_count ?? null);
+        setActiveBotRulesCount(edgeData.stats.active_bot_rules_count ?? null);
+      }
+      if (edgeData?.platform_config) {
+        setPlatformConfig(edgeData.platform_config);
+      }
+      setCommunityEvents(edgeData?.community_events || []);
 
       const academiesMap = new Map<string, string>();
       if (academiesData) {
@@ -611,9 +679,12 @@ export function AdminPortal() {
       // 6. FEE TRANSACTIONS (platform-wide, keyed by tutor_id)
       // ─────────────────────────────────────────────────────────────
       setFinanceLogs(financeData || []);
+
+      return !!edgeData;
     } catch (err: any) {
       console.error('Error fetching platform admin data:', err);
       showNotice('error', 'Notice: ' + (err?.message || 'Check database permissions'));
+      return false;
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -922,8 +993,9 @@ export function AdminPortal() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                fetchPlatformData();
-                fetchQuickAccessStats();
+                fetchPlatformData().then((edgeSucceeded) => {
+                  if (!edgeSucceeded) fetchQuickAccessStats();
+                });
               }}
               disabled={isRefreshing}
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-ink-200 transition-all hover:bg-white/[0.08] hover:text-white"
@@ -969,6 +1041,9 @@ export function AdminPortal() {
               { id: 'whatsappbot', label: 'Automation Bot', icon: Bot },
               { id: 'admissions', label: 'Admissions & Trials (' + admissions.length + ')', icon: MessageSquare, count: admissions.length },
               { id: 'tickets', label: 'Support Desk (' + tickets.length + ')', icon: HelpCircle, badge: kpis.openTickets },
+              { id: 'events', label: 'Community Events (' + communityEvents.length + ')', icon: CalendarDays, count: communityEvents.length },
+              { id: 'settings', label: 'Platform Settings', icon: Settings },
+              { id: 'authregistry', label: 'Auth Registry', icon: ShieldAlert },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1267,6 +1342,66 @@ export function AdminPortal() {
                   <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
                     <span className="inline-block h-2 w-2 rounded-full bg-rose-400"></span>
                     <span>Review queue &amp; enrollment history</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('events')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-fuchsia-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Community Events</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-400">
+                      <CalendarDays className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-3xl font-bold text-white">{communityEvents.length}</span>
+                    <span className="text-xs text-ink-400">Total Events</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-fuchsia-400"></span>
+                    <span>Public &amp; private, moderate or remove</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('authregistry')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-amber-500/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Auth Registry</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500/15 text-amber-400">
+                      <ShieldAlert className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-lg font-bold text-white">Check for orphans</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
+                    <span>Auth accounts with no profile/tutor row</span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('settings')}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-slate-400/40 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Platform Settings</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-500/15 text-slate-300">
+                      <Settings className="h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="font-display text-lg font-bold text-white">
+                      {platformConfig ? 'Configured' : 'Loading...'}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-slate-400"></span>
+                    <span>Quotas, support contact &amp; defaults</span>
                   </div>
                 </div>
               </div>
@@ -2038,6 +2173,21 @@ export function AdminPortal() {
             )}
           </div>
         )}
+
+        {activeTab === 'events' && (
+          <CommunityEventsDashboard events={communityEvents} onEventDeleted={(eventId) => {
+            setCommunityEvents((prev) => prev.filter((e) => e.id !== eventId));
+          }} />
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <PlatformSettingsDashboard config={platformConfig} onSaved={(updated) => setPlatformConfig(updated)} />
+            <AdminAccountDashboard adminUser={adminUser} />
+          </div>
+        )}
+
+        {activeTab === 'authregistry' && <AuthRegistryDashboard />}
       </main>
 
       {/* Modal: Enroll New Student */}

@@ -169,7 +169,31 @@ you ever want it back, `supabase_whatsapp_remove_inbox.sql` (which dropped
 `whatsapp_messages`) documents what existed; rebuilding it means recreating
 that table, the two removed files/functions, and re-wiring the UI.
 
-## 8. Known limitations / natural next steps
+## 8. 24-hour session window tracking
+
+Added alongside the bot, same "as little storage as possible" philosophy:
+`whatsapp_session_windows` stores **only** a phone number and the timestamp
+of its most recent inbound message — never message content. This lets the
+admin portal show which numbers are still inside Meta's 24-hour free-form
+reply window (visible as the "Recently Active on WhatsApp" panel at the top
+of the `Automation Bot` tab), without reintroducing anything like the
+removed inbox in §7.
+
+- **Written by**: `recordSessionWindow()` in `whatsapp-inbox-webhook`, on
+  every inbound message — upserts `last_message_at` for the sender, then
+  deletes any row older than 24 hours in the same call. No separate cron:
+  the table self-prunes as a side effect of normal webhook traffic, so it
+  never holds more than roughly a day's worth of numbers.
+- **Setup**: run `supabase_whatsapp_session_windows_setup.sql` once (same
+  SQL Editor workflow as `supabase_whatsapp_bot_setup.sql`). Admin-only
+  `SELECT` RLS policy; no client-side write path exists at all — only the
+  webhook (service-role key) ever writes to this table.
+- **Reading it elsewhere**: any admin-authenticated query — e.g.
+  `select * from whatsapp_session_windows where phone = '...'` — tells you
+  whether a free-form (non-template) WhatsApp message can be sent to that
+  number right now.
+
+## 9. Known limitations / natural next steps
 
 - Matching is plain keyword contains/exact — no typo tolerance, synonyms, or
   intent understanding. Fine for "fees", "timing", "location"; not for

@@ -4,13 +4,13 @@ const FOUNDERS = [
   {
     name: 'Abhishek Khode',
     role: 'Co-Founder',
-    bio: 'Passionate about sports and technology, driven to connect local communities with the best coaching talent.',
+    bio: 'Building scalable and secure platforms. Dedicated to making the technical aspects of sports management invisible and effortless',
     img: '/Abhi.png',
   },
   {
     name: 'Ashley Albert',
     role: 'Co-Founder',
-    bio: 'Building scalable and secure platforms. Dedicated to making the technical aspects of sports management invisible and effortless.',
+    bio: 'Passionate about sports and technology, driven to connect local communities with the best coaching talent.',
     img: '/Ashley.jpeg',
   }
 ];
