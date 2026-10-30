@@ -6,6 +6,12 @@ import { resolve } from 'node:path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Vite only exposes VITE_-prefixed env vars to client code by default
+  // (a deliberate safeguard against accidentally bundling server secrets).
+  // Explicitly allowing the ACADEMY_ prefix too lets the directory project's
+  // config use shorter names without disabling that safeguard for anything
+  // else — only vars starting with one of these two prefixes are exposed.
+  envPrefix: ['VITE_', 'ACADEMY_'],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

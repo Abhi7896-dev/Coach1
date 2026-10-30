@@ -8,6 +8,8 @@ import { Security } from '@/components/Security';
 import { AboutUs } from '@/components/AboutUs';
 import { CallToAction } from '@/components/CallToAction';
 import { Footer } from '@/components/Footer';
+import { BackToTop } from '@/components/BackToTop';
+import { FloatingAppWidget } from '@/components/FloatingAppWidget';
 import { useReveal } from '@/hooks/useReveal';
 import gsap from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
@@ -31,6 +33,8 @@ export function Home() {
         <CallToAction />
       </main>
       <Footer />
+      <BackToTop />
+      <FloatingAppWidget />
     </div>
   );
 }

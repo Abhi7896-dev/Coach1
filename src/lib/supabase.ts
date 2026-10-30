@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL =
+export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || 'https://boonnputmbbdrfnczipq.supabase.co';
-const SUPABASE_ANON_KEY =
+export const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvb25ucHV0bWJiZHJmbmN6aXBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MzEyNTIsImV4cCI6MjEwMjIwNzI1Mn0.9h1e-V63bKsrSsgh0axp-omjouiAq2PG1EjhEMIXijA';
 
@@ -18,42 +18,44 @@ export interface AdminUser {
   id: string;
   email: string;
   phone?: string;
-  role: string;
+  role: 'admin' | 'superadmin';
+  isSuperAdmin: boolean;
   fullName?: string;
 }
 
 /**
- * Checks if the specified user has admin privileges.
- * Validates both 'profiles' and 'tutors' tables.
+ * Returns the admin's actual role tier ('admin' | 'superadmin'), or null if
+ * this user isn't a platform admin at all. Checks both 'profiles' and
+ * 'tutors' tables. Previously this only returned a boolean — every admin
+ * was treated as identical regardless of what was actually in the database,
+ * so there was no way to tell a root owner apart from any other admin.
  */
-export async function verifyAdminRole(userId: string): Promise<boolean> {
+export async function getAdminRole(userId: string): Promise<'admin' | 'superadmin' | null> {
   try {
-    // 1. Check profiles table
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', userId)
       .maybeSingle();
 
-    if (profile && (profile.role === 'admin' || profile.role === 'superadmin')) {
-      return true;
+    if (profile?.role === 'admin' || profile?.role === 'superadmin') {
+      return profile.role;
     }
 
-    // 2. Check tutors table
     const { data: tutor } = await supabase
       .from('tutors')
       .select('role')
       .eq('id', userId)
       .maybeSingle();
 
-    if (tutor && (tutor.role === 'admin' || tutor.role === 'superadmin')) {
-      return true;
+    if (tutor?.role === 'admin' || tutor?.role === 'superadmin') {
+      return tutor.role;
     }
 
-    return false;
+    return null;
   } catch (err) {
-    console.error('[verifyAdminRole] Error checking admin role:', err);
-    return false;
+    console.error('[getAdminRole] Error checking admin role:', err);
+    return null;
   }
 }
 
@@ -123,8 +125,8 @@ export async function signInAdmin(identifier: string, password: string): Promise
     throw new Error('Authentication failed: No user returned');
   }
 
-  const isAdmin = await verifyAdminRole(authRes.user.id);
-  if (!isAdmin) {
+  const role = await getAdminRole(authRes.user.id);
+  if (!role) {
     await supabase.auth.signOut();
     throw new Error('Access Denied: This account does not have Platform Admin privileges in TruCoach.');
   }
@@ -142,9 +144,62 @@ export async function signInAdmin(identifier: string, password: string): Promise
     id: authRes.user.id,
     email: authRes.user.email || input,
     phone: tut?.phone,
-    role: 'admin',
+    role,
+    isSuperAdmin: role === 'superadmin',
     fullName: adminName,
   };
+}
+
+/**
+ * Sends the login-time second-factor code to the just-authenticated admin's
+ * own email, reusing the exact send-email-notification path already used
+ * for the create-admin / change-password OTP flows — generated and compared
+ * client-side (no server-side OTP state), same established pattern, same
+ * threat model: this gates a password alone being enough to reach the
+ * portal, not email ownership of the account.
+ */
+export async function sendAdminLoginOtp(adminUser: AdminUser): Promise<string> {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const { error } = await supabase.functions.invoke('send-email-notification', {
+    body: {
+      action: 'email_verification_otp',
+      to_email: adminUser.email,
+      user_name: adminUser.fullName || 'Admin',
+      otp: code,
+    },
+  });
+  if (error) {
+    throw new Error(error.message || 'Failed to send verification code.');
+  }
+  return code;
+}
+
+const ADMIN_2FA_SESSION_KEY = 'trucoach_admin_2fa_verified';
+
+/** Marks THIS browser tab's session as having passed login-time 2FA. */
+export function markAdmin2faVerified(): void {
+  try {
+    sessionStorage.setItem(ADMIN_2FA_SESSION_KEY, '1');
+  } catch (_) {}
+}
+
+/**
+ * Whether this tab's session has passed 2FA. Deliberately sessionStorage,
+ * not localStorage — a closed tab/browser requires a fresh code next time,
+ * same as requiring a fresh password; an open tab's own refresh does not.
+ */
+export function isAdmin2faVerified(): boolean {
+  try {
+    return sessionStorage.getItem(ADMIN_2FA_SESSION_KEY) === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+export function clearAdmin2faVerified(): void {
+  try {
+    sessionStorage.removeItem(ADMIN_2FA_SESSION_KEY);
+  } catch (_) {}
 }
 
 /**
@@ -173,18 +228,25 @@ export async function signOutAdmin(): Promise<void> {
   try {
     await supabase.removeAllChannels();
   } catch (_) {}
+  clearAdmin2faVerified();
   await supabase.auth.signOut({ scope: 'global' });
 }
 
 /**
- * Retrieves the currently active session and checks admin role.
+ * Retrieves the currently active session and checks admin role. Also
+ * requires this tab to have already passed login-time 2FA (see
+ * isAdmin2faVerified) — a Supabase session alone (e.g. restored in a fresh
+ * tab from localStorage) is not treated as a complete login; the caller is
+ * expected to send the admin back through the OTP step if this returns null
+ * while a Supabase auth session still technically exists.
  */
 export async function getAdminSession(): Promise<AdminUser | null> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return null;
+  if (!isAdmin2faVerified()) return null;
 
-  const isAdmin = await verifyAdminRole(session.user.id);
-  if (!isAdmin) return null;
+  const role = await getAdminRole(session.user.id);
+  if (!role) return null;
 
   const [{ data: prof }, { data: tut }] = await Promise.all([
     supabase.from('profiles').select('full_name, name').eq('id', session.user.id).maybeSingle(),
@@ -197,7 +259,8 @@ export async function getAdminSession(): Promise<AdminUser | null> {
     id: session.user.id,
     email: session.user.email || '',
     phone: tut?.phone,
-    role: 'admin',
+    role,
+    isSuperAdmin: role === 'superadmin',
     fullName: adminName,
   };
 }

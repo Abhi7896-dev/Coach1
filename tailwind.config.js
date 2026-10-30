@@ -83,26 +83,56 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-12px)' },
         },
+        'float-slow': {
+          '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+          '50%': { transform: 'translateY(-16px) rotate(1.5deg)' },
+        },
+        'float-reverse': {
+          '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+          '50%': { transform: 'translateY(14px) rotate(-1.5deg)' },
+        },
         'pulse-ring': {
           '0%': { transform: 'scale(0.8)', opacity: '0.6' },
           '100%': { transform: 'scale(2.2)', opacity: '0' },
+        },
+        'pulse-glow': {
+          '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+          '50%': { opacity: '0.75', transform: 'scale(1.08)' },
         },
         marquee: {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
         },
+        'marquee-reverse': {
+          '0%': { transform: 'translateX(-50%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        'spin-slow': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
+        'spin-reverse-slow': {
+          '0%': { transform: 'rotate(360deg)' },
+          '100%': { transform: 'rotate(0deg)' },
         },
       },
       animation: {
         'fade-up': 'fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both',
         'fade-in': 'fade-in 0.8s ease both',
         float: 'float 6s ease-in-out infinite',
+        'float-slow': 'float-slow 8s ease-in-out infinite',
+        'float-reverse': 'float-reverse 7s ease-in-out infinite',
         'pulse-ring': 'pulse-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+        'pulse-glow': 'pulse-glow 5s ease-in-out infinite',
         marquee: 'marquee 28s linear infinite',
+        'marquee-reverse': 'marquee-reverse 26s linear infinite',
         shimmer: 'shimmer 2.5s linear infinite',
+        'spin-slow': 'spin-slow 45s linear infinite',
+        'spin-reverse-slow': 'spin-reverse-slow 50s linear infinite',
       },
     },
   },

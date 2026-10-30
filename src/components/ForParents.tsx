@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { motion, Variants } from 'framer-motion';
 import gsap from 'gsap';
-
+import { BackgroundScreening } from './motion/BackgroundScreening';
+import { SpotlightCard } from './motion/SpotlightCard';
 
 const contentVariants: Variants = {
   hidden: { opacity: 0, x: -40 },
@@ -31,8 +32,8 @@ const PARENT_IMG =
 const BENEFITS = [
   {
     icon: CalendarCheck,
-    title: 'E Power System',
-    body: "TruCoach not only Provides Automaiton but also builds a Community Ecosystem to explore, attend Upcoming or Ongoing Diff. Sports Events across the City.",
+    title: 'Live Attendance Tracking',
+    body: "See every practice session marked in real time — know the moment your child checks in, with a complete attendance history always at your fingertips.",
   },
   {
     icon: TrendingUp,
@@ -76,70 +77,67 @@ export function ForParents() {
       id="parents"
       className="relative scroll-mt-24 overflow-hidden bg-blue-950 py-16 text-white lg:py-24"
     >
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute -right-40 -top-20 h-[500px] w-[500px] rounded-full bg-blue-500/25 blur-[120px]" />
-        <div className="absolute -left-32 bottom-0 h-[440px] w-[440px] rounded-full bg-green-500/15 blur-[120px]" />
-        <div className="absolute inset-0 grid-bg opacity-[0.25]" />
-      </div>
+      <BackgroundScreening variant="blue" showCourtLines={true} showParticles={true}>
+        <div className="container-page py-6">
+          <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+            {/* Copy */}
+            <motion.div 
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-10%" }}
+              variants={contentVariants}
+            >
+              <motion.span variants={itemVariants} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-ink-200 backdrop-blur">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                For the Parent
+              </motion.span>
+              <motion.h2 variants={itemVariants} className="mt-5 font-display text-3xl font-700 leading-tight tracking-tight sm:text-4xl lg:text-[2.9rem]">
+                A transparent window into
+                <br />
+                <span className="bg-gradient-to-r from-blue-300 via-blue-200 to-green-300 bg-clip-text text-transparent">
+                  your child's growth.
+                </span>
+              </motion.h2>
+              <motion.p variants={itemVariants} className="mt-5 max-w-xl text-lg leading-relaxed text-ink-200">
+                Peace of mind, in your pocket. See exactly what happens at practice,
+                receive monthly PDF progress cards, pay fees in one tap —
+                and easily discover new local sports communities and verified tutors.
+              </motion.p>
 
-      <div className="container-page">
-        <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-          {/* Copy */}
-          {/* Copy */}
-          <motion.div 
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-10%" }}
-            variants={contentVariants}
-          >
-            <motion.span variants={itemVariants} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-ink-200 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-              For the Parent
-            </motion.span>
-            <motion.h2 variants={itemVariants} className="mt-5 font-display text-3xl font-700 leading-tight tracking-tight sm:text-4xl lg:text-[2.9rem]">
-              A transparent window into
-              <br />
-              <span className="bg-gradient-to-r from-blue-300 via-blue-200 to-green-300 bg-clip-text text-transparent">
-                your child's growth.
-              </span>
-            </motion.h2>
-            <motion.p variants={itemVariants} className="mt-5 max-w-xl text-lg leading-relaxed text-ink-200">
-              Peace of mind, in your pocket. See exactly what happens at practice,
-              receive monthly PDF progress cards, pay fees in one tap —
-              and easily discover new local sports communities and verified tutors.
-            </motion.p>
-
-            <motion.div variants={itemVariants} className="mt-10 grid gap-4 sm:grid-cols-2">
-              {BENEFITS.map((b, i) => (
-                <motion.div
-                  key={b.title}
-                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  className="group rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur transition-all duration-300 hover:border-blue-300/40 hover:bg-white/10"
-                >
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-500/15 text-blue-300 transition-colors group-hover:bg-blue-400 group-hover:text-blue-950">
-                    <b.icon className="h-5.5 w-5.5" />
-                  </span>
-                  <h3 className="mt-4 font-display text-lg font-600 text-white">
-                    {b.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-300">{b.body}</p>
-                </motion.div>
-              ))}
+              <motion.div variants={itemVariants} className="mt-10 grid gap-4 sm:grid-cols-2">
+                {BENEFITS.map((b, i) => (
+                  <SpotlightCard
+                    key={b.title}
+                    spotlightColor="rgba(50, 130, 251, 0.18)"
+                    glowColor="rgba(50, 130, 251, 0.45)"
+                    className="group border border-white/10 bg-white/[0.05] p-5 backdrop-blur transition-all duration-300 hover:border-blue-300/40 hover:bg-white/10"
+                  >
+                    <span className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-blue-400 to-blue-600 transition-transform duration-300 group-hover:scale-x-100" />
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-500/15 text-blue-300 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:bg-blue-400 group-hover:text-blue-950">
+                      <b.icon className="h-5.5 w-5.5" />
+                    </span>
+                    <h3 className="mt-4 font-display text-lg font-600 text-white">
+                      {b.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-ink-300">{b.body}</p>
+                  </SpotlightCard>
+                ))}
+              </motion.div>
             </motion.div>
-          </motion.div>
 
-          {/* Phone mockup */}
-          <motion.div 
-            initial={{ opacity: 0, x: 40 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-10%" }}
-            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-            className="relative mx-auto"
-          >
-            <PhoneMockup />
-          </motion.div>
+            {/* Phone mockup */}
+            <motion.div 
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-10%" }}
+              transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+              className="relative mx-auto"
+            >
+              <PhoneMockup />
+            </motion.div>
+          </div>
         </div>
-      </div>
+      </BackgroundScreening>
     </section>
   );
 }
@@ -189,7 +187,11 @@ function PhoneMockup() {
                   <div className="text-sm font-semibold text-ink-900">Aarav · Batch A</div>
                   <div className="text-[10px] text-ink-400">Velocity Academy</div>
                 </div>
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
+                <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700 shadow-xs">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-600" />
+                  </span>
                   Present
                 </span>
               </div>

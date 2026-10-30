@@ -20,6 +20,21 @@
   ::selection {
     @apply bg-orange-500/20 text-ink-950;
   }
+
+  @keyframes msg-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-msg-in {
+    animation: msg-in 0.16s ease-out;
+  }
 }
 
 @layer components {
@@ -32,7 +47,39 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(251,90,12,0.6)] transition-all duration-300 hover:bg-orange-600 hover:shadow-[0_12px_32px_-8px_rgba(251,90,12,0.7)] hover:-translate-y-0.5 active:translate-y-0;
+    @apply relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(251,90,12,0.6)] transition-all duration-300 hover:bg-orange-600 hover:shadow-[0_12px_32px_-8px_rgba(251,90,12,0.7)] hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 40%;
+    height: 200%;
+    background: linear-gradient(
+      60deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.35) 50%,
+      transparent 80%
+    );
+    transform: rotate(25deg);
+    animation: btn-shine 4.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes btn-shine {
+    0%, 75% {
+      left: -60%;
+      opacity: 0;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      left: 140%;
+      opacity: 0;
+    }
   }
 
   .btn-secondary {
@@ -54,17 +101,47 @@
     background-size: 48px 48px;
   }
 
+  .grid-bg-dark {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
   .dot-bg {
     background-image: radial-gradient(rgba(15, 18, 25, 0.08) 1px, transparent 1px);
     background-size: 22px 22px;
   }
 
+  .dot-bg-dark {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
   .text-gradient-warm {
     @apply bg-gradient-to-r from-orange-500 via-orange-600 to-orange-500 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-athletic {
+    @apply bg-gradient-to-r from-orange-400 via-yellow-300 to-green-400 bg-clip-text text-transparent;
   }
 }
 
 @layer utilities {
+  .pause-hover:hover {
+    animation-play-state: paused !important;
+  }
+
+  .animated-stroke {
+    stroke-dasharray: 8 6;
+    animation: stroke-move 20s linear infinite;
+  }
+
+  @keyframes stroke-move {
+    to {
+      stroke-dashoffset: -100;
+    }
+  }
   .reveal {
     opacity: 0;
     transform: translateY(28px);

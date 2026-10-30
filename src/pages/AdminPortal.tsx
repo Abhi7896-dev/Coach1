@@ -35,6 +35,13 @@ import {
   CalendarDays,
   Settings,
   ShieldAlert,
+  Bell,
+  UploadCloud,
+  Receipt,
+  ExternalLink,
+  PhoneCall,
+  Clock,
+  LifeBuoy,
 } from 'lucide-react';
 import { supabase, signOutAdmin, getAdminSession, AdminUser } from '@/lib/supabase';
 import { CoachProfileModal } from '@/components/admin/CoachProfileModal';
@@ -43,9 +50,14 @@ import { GrowthDashboard } from '@/components/admin/GrowthDashboard';
 import { FeeTransactionsDashboard } from '@/components/admin/FeeTransactionsDashboard';
 import { UserActivityDashboard } from '@/components/admin/UserActivityDashboard';
 import { WhatsAppTemplatesDashboard } from '@/components/admin/WhatsAppTemplatesDashboard';
+import { PushTemplatesDashboard } from '@/components/admin/PushTemplatesDashboard';
+import { FeatureFlagsDashboard } from '@/components/admin/FeatureFlagsDashboard';
+import { BroadcastDashboard } from '@/components/admin/BroadcastDashboard';
+import { BulkStudentImportDashboard } from '@/components/admin/BulkStudentImportDashboard';
+import { PaymentNotificationsDashboard } from '@/components/admin/PaymentNotificationsDashboard';
+import { WhatsAppInboxDashboard } from '@/components/admin/WhatsAppInboxDashboard';
 import { MessageLogsDashboard } from '@/components/admin/MessageLogsDashboard';
 import { AccountDeletionRequestsDashboard } from '@/components/admin/AccountDeletionRequestsDashboard';
-import { WhatsAppBotDashboard } from '@/components/admin/WhatsAppBotDashboard';
 import { CommunityEventsDashboard } from '@/components/admin/CommunityEventsDashboard';
 import { PlatformSettingsDashboard } from '@/components/admin/PlatformSettingsDashboard';
 import { AuthRegistryDashboard } from '@/components/admin/AuthRegistryDashboard';
@@ -140,6 +152,8 @@ export interface PlatformConfig {
   max_location_changes: number | null;
   location_change_window_days: number | null;
   otp_mandatory_for_location: boolean | null;
+  min_app_version_android: string | null;
+  min_app_version_ios: string | null;
   updated_at: string | null;
 }
 
@@ -172,9 +186,12 @@ export function AdminPortal() {
     | 'finance'
     | 'activity'
     | 'whatsapp'
+    | 'pushtemplates'
+    | 'bulkimport'
+    | 'paymentnotifications'
+    | 'whatsappinbox'
     | 'messagelogs'
     | 'deletionrequests'
-    | 'whatsappbot'
     | 'admissions'
     | 'tickets'
     | 'events'
@@ -202,7 +219,6 @@ export function AdminPortal() {
   const [messagesSent7dCount, setMessagesSent7dCount] = useState<number | null>(null);
   const [deletionRequestsCount, setDeletionRequestsCount] = useState<number | null>(null);
   const [activeUsersCount, setActiveUsersCount] = useState<number | null>(null);
-  const [activeBotRulesCount, setActiveBotRulesCount] = useState<number | null>(null);
   const [totalStudentsCount, setTotalStudentsCount] = useState(0);
   const [totalBatchesCount, setTotalBatchesCount] = useState(0);
 
@@ -301,16 +317,6 @@ export function AdminPortal() {
     } catch (_) {
       setActiveUsersCount(null);
     }
-
-    try {
-      const { count } = await supabase
-        .from('whatsapp_bot_rules')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
-      setActiveBotRulesCount(count ?? null);
-    } catch (_) {
-      setActiveBotRulesCount(null);
-    }
   };
 
   const fetchPlatformData = async (): Promise<boolean> => {
@@ -381,7 +387,6 @@ export function AdminPortal() {
         setMessagesSent7dCount(edgeData.stats.messages_sent_7d_count ?? null);
         setDeletionRequestsCount(edgeData.stats.deletion_requests_count ?? null);
         setActiveUsersCount(edgeData.stats.active_users_30d_count ?? null);
-        setActiveBotRulesCount(edgeData.stats.active_bot_rules_count ?? null);
       }
       if (edgeData?.platform_config) {
         setPlatformConfig(edgeData.platform_config);
@@ -1004,12 +1009,19 @@ export function AdminPortal() {
               <span className="hidden sm:inline">Sync Data</span>
             </button>
 
-            <div className="hidden md:flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5">
-              <div className="grid h-7 w-7 place-items-center rounded-lg bg-orange-500/20 text-xs font-bold text-orange-400">
+            <div className="hidden md:flex items-center gap-2.5 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] px-3.5 py-1.5 shadow-inner backdrop-blur">
+              <div className={'grid h-8 w-8 place-items-center rounded-xl font-display text-xs font-bold text-white shadow-md ' + (adminUser?.isSuperAdmin ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-rose-600 ring-2 ring-amber-400/40' : 'bg-gradient-to-br from-blue-500 to-indigo-600')}>
                 {adminUser?.fullName?.charAt(0) || 'A'}
               </div>
               <div className="text-left">
-                <p className="text-xs font-bold leading-none text-white">{adminUser?.fullName}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-bold leading-none text-white">{adminUser?.fullName}</p>
+                  {adminUser?.isSuperAdmin && (
+                    <span className="inline-flex items-center rounded-full bg-gradient-to-r from-amber-500/25 to-orange-500/25 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300 border border-amber-500/40 shadow-sm">
+                      👑 Super Admin
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-ink-400">{adminUser?.email || adminUser?.phone}</p>
               </div>
             </div>
@@ -1024,52 +1036,97 @@ export function AdminPortal() {
           </div>
         </div>
 
-        {/* Top Tab Bar: Coaches, Academies, and Parents STRICTLY SEPARATED */}
-        <div className="mx-auto flex max-w-7xl overflow-x-auto px-4 sm:px-8">
-          <nav className="flex space-x-2 py-2">
+        {/* Top Tab Bar — grouped into logical clusters with an elite glass pill dock styling */}
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-8">
+          <nav className="scrollbar-none flex items-center gap-1.5 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
-              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-              { id: 'coaches', label: 'Coaches (' + coaches.length + ')', icon: GraduationCap, badge: kpis.pendingCoaches },
-              { id: 'academies', label: 'Academies (' + academies.length + ')', icon: Building2, count: academies.length },
-              { id: 'parents', label: 'Parents & Athletes (' + parents.length + ')', icon: Users, count: parents.length },
-              { id: 'growth', label: 'New Registrations', icon: TrendingUp },
-              { id: 'finance', label: 'Fee Transactions', icon: Wallet },
-              { id: 'activity', label: 'Active & Passive Users', icon: Activity },
-              { id: 'whatsapp', label: 'WhatsApp Templates', icon: MessageCircle },
-              { id: 'messagelogs', label: 'Message Logs', icon: Send },
-              { id: 'deletionrequests', label: 'Account Deletion Requests', icon: UserX },
-              { id: 'whatsappbot', label: 'Automation Bot', icon: Bot },
-              { id: 'admissions', label: 'Admissions & Trials (' + admissions.length + ')', icon: MessageSquare, count: admissions.length },
-              { id: 'tickets', label: 'Support Desk (' + tickets.length + ')', icon: HelpCircle, badge: kpis.openTickets },
-              { id: 'events', label: 'Community Events (' + communityEvents.length + ')', icon: CalendarDays, count: communityEvents.length },
-              { id: 'settings', label: 'Platform Settings', icon: Settings },
-              { id: 'authregistry', label: 'Auth Registry', icon: ShieldAlert },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  setSearchQuery('');
-                }}
-                className={'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ' +
-                  (activeTab === tab.id
-                    ? 'bg-white/15 text-white shadow-sm'
-                    : 'text-ink-400 hover:bg-white/[0.04] hover:text-ink-200')}
-              >
-                <tab.icon className="h-4 w-4" />
-                <span>{tab.label}</span>
-                {tab.badge ? (
-                  <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    {tab.badge}
-                  </span>
-                ) : tab.count !== undefined && tab.count > 0 ? (
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-ink-300">
-                    {tab.count}
-                  </span>
-                ) : null}
-              </button>
+              {
+                label: 'Overview',
+                tabs: [
+                  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+                  { id: 'coaches', label: 'Coaches (' + coaches.length + ')', icon: GraduationCap, badge: kpis.pendingCoaches },
+                  { id: 'academies', label: 'Academies (' + academies.length + ')', icon: Building2, count: academies.length },
+                  { id: 'parents', label: 'Parents & Athletes (' + parents.length + ')', icon: Users, count: parents.length },
+                  { id: 'growth', label: 'New Registrations', icon: TrendingUp },
+                  { id: 'finance', label: 'Fee Transactions', icon: Wallet },
+                  { id: 'activity', label: 'Active & Passive Users', icon: Activity },
+                ],
+              },
+              {
+                label: 'Messaging',
+                tabs: [
+                  { id: 'whatsapp', label: 'WhatsApp Templates', icon: MessageCircle },
+                  { id: 'pushtemplates', label: 'Push Templates', icon: Bell },
+                  { id: 'whatsappinbox', label: 'WhatsApp Inbox', icon: MessageCircle },
+                  { id: 'messagelogs', label: 'Message Logs', icon: Send },
+                  { id: 'paymentnotifications', label: 'Payment Notifications', icon: Receipt },
+                  { id: 'bulkimport', label: 'Bulk Import Students', icon: UploadCloud },
+                ],
+              },
+              {
+                label: 'Operations',
+                tabs: [
+                  { id: 'admissions', label: 'Admissions & Trials (' + admissions.length + ')', icon: MessageSquare, count: admissions.length },
+                  { id: 'tickets', label: 'Support Desk (' + tickets.length + ')', icon: HelpCircle, badge: kpis.openTickets },
+                  { id: 'events', label: 'Community Events (' + communityEvents.length + ')', icon: CalendarDays, count: communityEvents.length },
+                  { id: 'deletionrequests', label: 'Account Deletion Requests', icon: UserX },
+                ],
+              },
+              {
+                label: 'Platform',
+                tabs: [
+                  { id: 'settings', label: 'Platform Settings', icon: Settings },
+                  { id: 'authregistry', label: 'Auth Registry', icon: ShieldAlert },
+                ],
+              },
+            ].map((group, gi) => (
+              <React.Fragment key={group.label}>
+                {gi > 0 && <span className="mx-1.5 h-6 w-px shrink-0 bg-white/[0.08]" />}
+                {group.tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setSearchQuery('');
+                      }}
+                      className={
+                        'group relative flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold whitespace-nowrap transition-all duration-200 ' +
+                        (isActive
+                          ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25 ring-1 ring-white/20 -translate-y-0.5'
+                          : 'border border-white/5 bg-white/[0.03] text-ink-300 hover:border-white/10 hover:bg-white/[0.07] hover:text-white')
+                      }
+                    >
+                      <tab.icon className={'h-3.5 w-3.5 transition-transform duration-200 ' + (isActive ? '' : 'group-hover:scale-110')} />
+                      <span>{tab.label}</span>
+                      {tab.badge ? (
+                        <span
+                          className={
+                            'rounded-full px-1.5 py-0.5 text-[10px] font-bold ' +
+                            (isActive ? 'bg-white/25 text-white' : 'bg-orange-500 text-white')
+                          }
+                        >
+                          {tab.badge}
+                        </span>
+                      ) : tab.count !== undefined && tab.count > 0 ? (
+                        <span
+                          className={
+                            'rounded-full px-1.5 py-0.5 text-[10px] font-medium ' +
+                            (isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300')
+                          }
+                        >
+                          {tab.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </React.Fragment>
             ))}
           </nav>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#090c13] to-transparent sm:left-8" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#090c13] to-transparent sm:right-8" />
         </div>
       </header>
 
@@ -1077,331 +1134,357 @@ export function AdminPortal() {
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                TruCoach Platform Command Center
-              </h1>
-              <p className="mt-1 text-xs text-ink-400 sm:text-sm">
-                Real-time operational visibility across coaches, sports academies, guardians, and athletes.
-              </p>
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-orange-500/15 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-blue-500/15 blur-3xl" />
+
+              <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-[11px] font-bold text-orange-400 shadow-sm">
+                      <Sparkles className="h-3 w-3" />
+                      {adminUser?.isSuperAdmin ? 'Super Admin Command Console' : 'Platform Operations'}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Live Systems Operational
+                    </span>
+                  </div>
+                  <h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl lg:text-4xl">
+                    TruCoach Command Center
+                  </h1>
+                  <p className="mt-1.5 max-w-2xl text-xs text-ink-300 sm:text-sm leading-relaxed">
+                    Comprehensive real-time command across verified sports academies, coaches, athlete rosters, fee ledgers, and community discovery.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="rounded-2xl border border-white/10 bg-black/40 p-4 text-center backdrop-blur shadow-inner min-w-[125px]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">Total Roster</p>
+                    <p className="mt-1 font-display text-2xl font-extrabold text-white">{kpis.totalStudents}</p>
+                    <p className="text-[10px] text-emerald-400 font-semibold">Active Athletes</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/40 p-4 text-center backdrop-blur shadow-inner min-w-[125px]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">Total Coaches</p>
+                    <p className="mt-1 font-display text-2xl font-extrabold text-white">{kpis.totalCoaches}</p>
+                    <p className="text-[10px] text-orange-400 font-semibold">{academies.length} Academies</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* KPI Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <div
                 onClick={() => setActiveTab('coaches')}
-                className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-orange-500/40 hover:bg-white/[0.06]"
+                className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-950/20"
               >
+                <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-orange-500/20" />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Total Coaches</span>
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl bg-orange-500/15 text-orange-400">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-orange-300 transition-colors">Total Coaches</span>
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-orange-500/15 text-orange-400 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-orange-500/25">
                     <GraduationCap className="h-5 w-5" />
                   </span>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="font-display text-3xl font-bold text-white">{kpis.totalCoaches}</span>
-                  <span className="text-xs text-ink-400">Registered</span>
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="font-display text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{kpis.totalCoaches}</span>
+                  <span className="text-xs text-ink-400 font-medium">Registered</span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
-                  <span>{kpis.activeCoaches} Active · {kpis.pendingCoaches} Pending</span>
+                <div className="mt-3 flex items-center gap-2 text-xs text-ink-300 border-t border-white/5 pt-3">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+                  <span><strong className="text-white">{kpis.activeCoaches}</strong> Active · <strong className="text-amber-400">{kpis.pendingCoaches}</strong> Pending</span>
                 </div>
               </div>
 
               <div
                 onClick={() => setActiveTab('academies')}
-                className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-blue-500/40 hover:bg-white/[0.06]"
+                className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-950/20"
               >
+                <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-blue-500/20" />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Sports Academies</span>
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-500/15 text-blue-400">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-blue-300 transition-colors">Sports Academies</span>
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-500/15 text-blue-400 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-blue-500/25">
                     <Building2 className="h-5 w-5" />
                   </span>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="font-display text-3xl font-bold text-white">{academies.length}</span>
-                  <span className="text-xs text-ink-400">Academies</span>
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="font-display text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{academies.length}</span>
+                  <span className="text-xs text-ink-400 font-medium">Organizations</span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                  <span className="inline-block h-2 w-2 rounded-full bg-blue-400"></span>
-                  <span>Organizations registered</span>
+                <div className="mt-3 flex items-center gap-2 text-xs text-ink-300 border-t border-white/5 pt-3">
+                  <span className="inline-block h-2 w-2 rounded-full bg-blue-400 shadow-sm shadow-blue-400/50"></span>
+                  <span>Multi-coach verified hubs</span>
                 </div>
               </div>
 
               <div
                 onClick={() => setActiveTab('parents')}
-                className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-emerald-500/40 hover:bg-white/[0.06]"
+                className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/20"
               >
+                <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-emerald-500/20" />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Athletes &amp; Parents</span>
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-400">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-emerald-300 transition-colors">Athletes &amp; Parents</span>
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-400 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-emerald-500/25">
                     <Users className="h-5 w-5" />
                   </span>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="font-display text-3xl font-bold text-white">{kpis.totalStudents}</span>
-                  <span className="text-xs text-ink-400">Athletes</span>
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="font-display text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{kpis.totalStudents}</span>
+                  <span className="text-xs text-ink-400 font-medium">Athletes</span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
-                  <span>{parents.length} Registered Guardians</span>
+                <div className="mt-3 flex items-center gap-2 text-xs text-ink-300 border-t border-white/5 pt-3">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+                  <span><strong className="text-white">{parents.length}</strong> Guardians connected</span>
                 </div>
               </div>
 
               <div
                 onClick={() => setActiveTab('admissions')}
-                className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-amber-500/40 hover:bg-white/[0.06]"
+                className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-950/20"
               >
+                <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-amber-500/20" />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Inquiries &amp; Trials</span>
-                  <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500/15 text-amber-400">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-amber-300 transition-colors">Inquiries &amp; Trials</span>
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-500/15 text-amber-400 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-amber-500/25">
                     <HelpCircle className="h-5 w-5" />
                   </span>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="font-display text-3xl font-bold text-white">{admissions.length}</span>
-                  <span className="text-xs text-ink-400">Queries</span>
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="font-display text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{admissions.length}</span>
+                  <span className="text-xs text-ink-400 font-medium">Queries</span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                  <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
-                  <span>{tickets.length} Support Tickets</span>
+                <div className="mt-3 flex items-center gap-2 text-xs text-ink-300 border-t border-white/5 pt-3">
+                  <span className="inline-block h-2 w-2 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50"></span>
+                  <span><strong className="text-white">{tickets.length}</strong> Support Tickets</span>
                 </div>
               </div>
             </div>
 
             {/* Quick Access — every other section in the console, one click away */}
             <div>
-              <h3 className="font-display text-sm font-bold uppercase tracking-wider text-ink-400 mb-3">
-                Quick Access
-              </h3>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-xs font-extrabold uppercase tracking-widest text-ink-400 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-orange-500" />
+                  Direct Operations &amp; Intelligence
+                </h3>
+                <span className="text-[11px] text-ink-500 font-medium">Instant Navigation</span>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 <div
                   onClick={() => setActiveTab('growth')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-purple-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-500/50 hover:bg-purple-500/[0.03] hover:shadow-xl hover:shadow-purple-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-purple-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-purple-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">New Registrations</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-purple-500/15 text-purple-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-purple-300 transition-colors">New Registrations</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-purple-500/15 text-purple-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <TrendingUp className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">{parents.length}</span>
-                    <span className="text-xs text-ink-400">Total Parents</span>
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">{parents.length}</span>
+                    <span className="text-xs text-ink-400 font-medium">Total Parents</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-purple-400"></span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-purple-400 shadow-sm shadow-purple-400/50"></span>
                     <span>Growth trend &amp; sign-ups over time</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('finance')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-teal-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-teal-500/50 hover:bg-teal-500/[0.03] hover:shadow-xl hover:shadow-teal-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-teal-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-teal-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Fee Transactions</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-teal-500/15 text-teal-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-teal-300 transition-colors">Fee Transactions</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-teal-500/15 text-teal-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <Wallet className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">{financeLogs.length}</span>
-                    <span className="text-xs text-ink-400">Transactions</span>
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">{financeLogs.length}</span>
+                    <span className="text-xs text-ink-400 font-medium">Ledger Records</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-teal-400"></span>
-                    <span>Cashflow &amp; payment method breakdown</span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-teal-400 shadow-sm shadow-teal-400/50"></span>
+                    <span>Cashflow &amp; payment method split</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('activity')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-cyan-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-500/50 hover:bg-cyan-500/[0.03] hover:shadow-xl hover:shadow-cyan-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-cyan-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-cyan-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Active &amp; Passive Users</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-cyan-300 transition-colors">User Engagement</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <Activity className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">
                       {activeUsersCount !== null ? activeUsersCount : '—'}
                     </span>
-                    <span className="text-xs text-ink-400">Active (30d)</span>
+                    <span className="text-xs text-ink-400 font-medium">Active (30d)</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-cyan-400"></span>
-                    <span>{activeUsersCount !== null ? 'Signed in within 30 days' : 'Setup pending — see Active Users tab'}</span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+                    <span>{activeUsersCount !== null ? 'Signed in within past 30 days' : 'Real-time telemetry'}</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('tickets')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-sky-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-sky-500/50 hover:bg-sky-500/[0.03] hover:shadow-xl hover:shadow-sky-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-sky-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-sky-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Support Desk</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/15 text-sky-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-sky-300 transition-colors">Support Desk</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/15 text-sky-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <HelpCircle className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">{tickets.length}</span>
-                    <span className="text-xs text-ink-400">Tickets</span>
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">{tickets.length}</span>
+                    <span className="text-xs text-ink-400 font-medium">Tickets</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-sky-400"></span>
-                    <span>{kpis.openTickets} Open · Sort &amp; filter by role</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setActiveTab('whatsappbot')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-sky-500/40 hover:bg-white/[0.06]"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Automation Bot</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/15 text-sky-400">
-                      <Bot className="h-5 w-5" />
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">
-                      {activeBotRulesCount !== null ? activeBotRulesCount : '—'}
-                    </span>
-                    <span className="text-xs text-ink-400">Active Rules</span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-sky-400"></span>
-                    <span>Keyword auto-replies for inbound messages</span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-sky-400 shadow-sm shadow-sky-400/50"></span>
+                    <span><strong className="text-white">{kpis.openTickets}</strong> Open · Sort &amp; filter by role</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('whatsapp')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-green-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/50 hover:bg-emerald-500/[0.03] hover:shadow-xl hover:shadow-emerald-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-emerald-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-emerald-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">WhatsApp Templates</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-green-500/15 text-green-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-emerald-300 transition-colors">WhatsApp Templates</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <MessageCircle className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">
                       {whatsappTemplateCount !== null ? whatsappTemplateCount : '—'}
                     </span>
-                    <span className="text-xs text-ink-400">Registered</span>
+                    <span className="text-xs text-ink-400 font-medium">Registered</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-green-400"></span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
                     <span>Templates, variables &amp; demo previews</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('messagelogs')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-indigo-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/50 hover:bg-indigo-500/[0.03] hover:shadow-xl hover:shadow-indigo-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-indigo-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-indigo-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Message Logs</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-indigo-300 transition-colors">Message Logs</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <Send className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">
                       {messagesSent7dCount !== null ? messagesSent7dCount : '—'}
                     </span>
-                    <span className="text-xs text-ink-400">Sent (7d)</span>
+                    <span className="text-xs text-ink-400 font-medium">Sent (7d)</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-indigo-400"></span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-indigo-400 shadow-sm shadow-indigo-400/50"></span>
                     <span>Delivery history by recipient &amp; type</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('deletionrequests')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-rose-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-rose-500/50 hover:bg-rose-500/[0.03] hover:shadow-xl hover:shadow-rose-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-rose-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-rose-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Deletion Requests</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15 text-rose-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-rose-300 transition-colors">Deletion Requests</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/15 text-rose-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <UserX className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">
                       {deletionRequestsCount !== null ? deletionRequestsCount : '—'}
                     </span>
-                    <span className="text-xs text-ink-400">Total Requests</span>
+                    <span className="text-xs text-ink-400 font-medium">Total Requests</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-rose-400"></span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-rose-400 shadow-sm shadow-rose-400/50"></span>
                     <span>Review queue &amp; enrollment history</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('events')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-fuchsia-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-fuchsia-500/50 hover:bg-fuchsia-500/[0.03] hover:shadow-xl hover:shadow-fuchsia-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-fuchsia-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-fuchsia-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Community Events</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-fuchsia-300 transition-colors">Community Events</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <CalendarDays className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-bold text-white">{communityEvents.length}</span>
-                    <span className="text-xs text-ink-400">Total Events</span>
+                    <span className="font-display text-3xl font-extrabold text-white tracking-tight">{communityEvents.length}</span>
+                    <span className="text-xs text-ink-400 font-medium">Total Events</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-fuchsia-400"></span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-fuchsia-400 shadow-sm shadow-fuchsia-400/50"></span>
                     <span>Public &amp; private, moderate or remove</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('authregistry')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-amber-500/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:bg-amber-500/[0.03] hover:shadow-xl hover:shadow-amber-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-amber-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-amber-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Auth Registry</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500/15 text-amber-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-amber-300 transition-colors">Auth Registry</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500/15 text-amber-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <ShieldAlert className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-lg font-bold text-white">Check for orphans</span>
+                    <span className="font-display text-2xl font-extrabold text-white tracking-tight">Audit Accounts</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
-                    <span>Auth accounts with no profile/tutor row</span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50"></span>
+                    <span>Identify orphaned auth accounts</span>
                   </div>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('settings')}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-slate-400/40 hover:bg-white/[0.06]"
+                  className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-sky-500/50 hover:bg-sky-500/[0.03] hover:shadow-xl hover:shadow-sky-950/20"
                 >
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-sky-500/10 blur-xl transition-all duration-300 group-hover:scale-150 group-hover:bg-sky-500/20" />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink-400">Platform Settings</span>
-                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-500/15 text-slate-300">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400 group-hover:text-sky-300 transition-colors">Platform Settings</span>
+                    <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/15 text-sky-400 shadow-sm transition-transform duration-300 group-hover:scale-110">
                       <Settings className="h-5 w-5" />
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-lg font-bold text-white">
-                      {platformConfig ? 'Configured' : 'Loading...'}
+                    <span className="font-display text-2xl font-extrabold text-white tracking-tight">
+                      {platformConfig ? 'Configured' : 'Live Config'}
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-slate-400"></span>
-                    <span>Quotas, support contact &amp; defaults</span>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-400 border-t border-white/5 pt-3">
+                    <span className="inline-block h-2 w-2 rounded-full bg-sky-400 shadow-sm shadow-sky-400/50"></span>
+                    <span>Quotas, support contact &amp; rules</span>
                   </div>
                 </div>
               </div>
@@ -1579,122 +1662,192 @@ export function AdminPortal() {
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredCoaches.map((coach) => (
-                  <div
-                    key={coach.id}
-                    onClick={() => setSelectedCoach(coach)}
-                    className="cursor-pointer group flex flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:border-orange-500/40 hover:bg-white/[0.06] hover:shadow-2xl"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ' +
-                            (coach.status === 'approved'
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                              : coach.status === 'pending'
-                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
-                              : coach.status === 'paused'
-                              ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
-                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/20')}
+                {filteredCoaches.map((coach) => {
+                  const cleanPhone = (coach.phone || '').replace(/\D/g, '');
+                  const waUrl = cleanPhone ? 'https://wa.me/91' + cleanPhone : null;
+
+                  return (
+                    <div
+                      key={coach.id}
+                      onClick={() => setSelectedCoach(coach)}
+                      className="cursor-pointer group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] via-white/[0.015] to-transparent p-6 sm:p-7 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:border-orange-500/40 hover:bg-orange-500/[0.02] hover:shadow-2xl hover:shadow-orange-950/20"
+                    >
+                      {/* Top status accent line */}
+                      <div
+                        className={
+                          'absolute top-0 left-0 right-0 h-1 ' +
+                          (coach.status === 'approved'
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                            : coach.status === 'pending'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                            : coach.status === 'paused'
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                            : 'bg-rose-500')
+                        }
+                      />
+
+                      <div>
+                        {/* Status + View Profile Link */}
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={
+                              'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ' +
+                              (coach.status === 'approved'
+                                ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                                : coach.status === 'pending'
+                                ? 'border-amber-500/30 bg-amber-500/15 text-amber-300 shadow-sm shadow-amber-500/20'
+                                : coach.status === 'paused'
+                                ? 'border-blue-500/30 bg-blue-500/15 text-blue-300'
+                                : 'border-rose-500/30 bg-rose-500/15 text-rose-300')
+                            }
+                          >
+                            {coach.status === 'pending' && (
+                              <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400"></span>
+                              </span>
+                            )}
+                            {coach.status === 'approved' && (
+                              <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                            )}
+                            <span>{coach.status}</span>
+                          </span>
+
+                          <span className="text-[11px] text-ink-400 font-semibold group-hover:text-orange-400 flex items-center gap-1 transition">
+                            <span>Deep Profile</span>
+                            <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                          </span>
+                        </div>
+
+                        {/* Coach Identity & Academy */}
+                        <div className="mt-4 flex items-start gap-3">
+                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 text-base font-extrabold text-orange-400 ring-1 ring-orange-500/30 shadow-md">
+                            {coach.name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-display text-lg font-bold text-white group-hover:text-orange-300 transition truncate">
+                              {coach.name}
+                            </h3>
+                            <p className="text-xs font-semibold text-orange-400/90 flex items-center gap-1.5 mt-0.5 truncate">
+                              <Building2 className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{coach.academyName}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Sports Offered Tags */}
+                        <div className="mt-3.5 flex flex-wrap gap-1.5">
+                          {coach.sportsOffered.length > 0 ? (
+                            coach.sportsOffered.map((sport) => (
+                              <span
+                                key={sport}
+                                className="rounded-lg border border-white/5 bg-white/[0.05] px-2.5 py-0.5 text-[10px] font-bold text-ink-300"
+                              >
+                                {sport}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="rounded-lg bg-white/[0.03] px-2 py-0.5 text-[10px] text-ink-500">General Athletics</span>
+                          )}
+                        </div>
+
+                        {/* Metrics Grid */}
+                        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/5 pt-3.5">
+                          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-2.5">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-ink-400 block">Enrolled</span>
+                            <span className="font-display text-xl font-extrabold text-white">{coach.totalStudents}</span>
+                            <span className="text-[10px] text-ink-500 block">Athletes</span>
+                          </div>
+                          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-2.5">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-ink-400 block">Batches</span>
+                            <span className="font-display text-xl font-extrabold text-white">{coach.totalBatches}</span>
+                            <span className="text-[10px] text-ink-500 block">Active Schedules</span>
+                          </div>
+                        </div>
+
+                        {/* Contact & Location Strip */}
+                        <div className="mt-3.5 space-y-1.5 text-xs text-ink-300 border-t border-white/5 pt-3">
+                          {coach.phone && (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 font-mono text-ink-300">
+                                <Phone className="h-3.5 w-3.5 text-ink-400" />
+                                <span>{coach.phone}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                <a
+                                  href={'tel:' + coach.phone}
+                                  className="text-[11px] font-bold text-ink-400 hover:text-white transition"
+                                >
+                                  Call
+                                </a>
+                                {waUrl && (
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400 hover:bg-emerald-500/30 transition"
+                                  >
+                                    WA
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {coach.locality && (
+                            <div className="flex items-center gap-1.5 text-ink-400">
+                              <MapPin className="h-3.5 w-3.5 text-ink-400 shrink-0" />
+                              <span className="truncate">{coach.locality}{coach.pincode ? ' (' + coach.pincode + ')' : ''}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Action Footer */}
+                      <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setSelectedCoach(coach)}
+                          className="text-xs font-bold text-orange-400 hover:text-orange-300 transition flex items-center gap-1"
                         >
-                          {coach.status}
-                        </span>
-
-                        <span className="text-[11px] text-ink-400 font-medium group-hover:text-orange-400 flex items-center gap-1 transition">
-                          <span>View Profile</span>
+                          <span>Full Profile</span>
                           <ArrowUpRight className="h-3.5 w-3.5" />
-                        </span>
-                      </div>
+                        </button>
 
-                      <div className="mt-4">
-                        <h3 className="font-display text-lg font-bold text-white group-hover:text-orange-400 transition">
-                          {coach.name}
-                        </h3>
-                        <p className="text-xs font-medium text-orange-400 flex items-center gap-1 mt-0.5">
-                          <Building2 className="h-3.5 w-3.5 shrink-0" />
-                          <span>{coach.academyName}</span>
-                        </p>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {coach.sportsOffered.length > 0 ? (
-                          coach.sportsOffered.map((sport) => (
-                            <span
-                              key={sport}
-                              className="rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-ink-300"
+                        <div className="flex items-center gap-1.5">
+                          {coach.status === 'pending' && (
+                            <button
+                              onClick={() => handleUpdateCoachStatus(coach.id, 'approved')}
+                              className="rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-3.5 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition shadow-sm"
                             >
-                              {sport}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-ink-500">General Athletics</span>
-                        )}
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/5 pt-3 text-xs text-ink-300">
-                        <div>
-                          <span className="text-[10px] text-ink-400 block">Enrolled Students</span>
-                          <span className="font-bold text-white">{coach.totalStudents}</span>
+                              Approve
+                            </button>
+                          )}
+                          {coach.status === 'approved' && (
+                            <button
+                              onClick={() => handleUpdateCoachStatus(coach.id, 'paused')}
+                              className="rounded-xl border border-amber-500/30 bg-amber-500/20 px-3.5 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/30 transition shadow-sm"
+                            >
+                              Pause
+                            </button>
+                          )}
+                          {coach.status === 'paused' && (
+                            <button
+                              onClick={() => handleUpdateCoachStatus(coach.id, 'approved')}
+                              className="rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-3.5 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition shadow-sm"
+                            >
+                              Resume
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleUpdateCoachStatus(coach.id, 'rejected')}
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-medium text-ink-400 hover:bg-rose-500/20 hover:text-rose-400 transition"
+                          >
+                            Reject
+                          </button>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-ink-400 block">Active Batches</span>
-                          <span className="font-bold text-white">{coach.totalBatches}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 space-y-1 text-xs text-ink-400">
-                        {coach.phone && (
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="h-3 w-3 text-ink-400" />
-                            <span className="font-mono">{coach.phone}</span>
-                          </div>
-                        )}
-                        {coach.locality && (
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className="h-3 w-3 text-ink-400" />
-                            <span>{coach.locality}{coach.pincode ? ' (' + coach.pincode + ')' : ''}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
-
-                    <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => setSelectedCoach(coach)}
-                        className="text-xs font-bold text-orange-400 hover:text-orange-300"
-                      >
-                        Deep Profile &rarr;
-                      </button>
-
-                      <div className="flex items-center gap-1.5">
-                        {coach.status === 'pending' && (
-                          <button
-                            onClick={() => handleUpdateCoachStatus(coach.id, 'approved')}
-                            className="rounded-xl bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400 hover:bg-emerald-500/30"
-                          >
-                            Approve
-                          </button>
-                        )}
-                        {coach.status === 'approved' && (
-                          <button
-                            onClick={() => handleUpdateCoachStatus(coach.id, 'paused')}
-                            className="rounded-xl bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-400 hover:bg-amber-500/30"
-                          >
-                            Pause
-                          </button>
-                        )}
-                        {coach.status === 'paused' && (
-                          <button
-                            onClick={() => handleUpdateCoachStatus(coach.id, 'approved')}
-                            className="rounded-xl bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400 hover:bg-emerald-500/30"
-                          >
-                            Resume
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1731,89 +1884,127 @@ export function AdminPortal() {
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredAcademies.map((academy) => (
-                  <div
-                    key={academy.name}
-                    className="flex flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:border-blue-500/40 hover:bg-white/[0.06] hover:shadow-2xl"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-[11px] font-bold text-blue-400">
-                          <Building2 className="h-3.5 w-3.5" />
-                          <span>Sports Academy</span>
-                        </span>
+                {filteredAcademies.map((academy) => {
+                  const cleanPhone = (academy.headCoachPhone || '').replace(/\D/g, '');
+                  const waUrl = cleanPhone ? 'https://wa.me/91' + cleanPhone : null;
 
-                        <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-ink-300">
-                          {academy.coachesCount} Coach{academy.coachesCount > 1 ? 'es' : ''}
-                        </span>
-                      </div>
+                  return (
+                    <div
+                      key={academy.name}
+                      className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] via-white/[0.015] to-transparent p-6 sm:p-7 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:border-blue-500/40 hover:bg-blue-500/[0.02] hover:shadow-2xl hover:shadow-blue-950/20"
+                    >
+                      {/* Top status accent line */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
 
-                      <div className="mt-4">
-                        <h3 className="font-display text-lg font-bold text-white">
-                          {academy.name}
-                        </h3>
-                        <p className="text-xs text-ink-400 mt-1">
-                          Lead Coach: <strong className="text-white">{academy.headCoachName}</strong>
-                          {academy.headCoachPhone ? ' (' + academy.headCoachPhone + ')' : ''}
-                        </p>
-                      </div>
+                      <div>
+                        {/* Header Badge Row */}
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-blue-300">
+                            <Building2 className="h-3.5 w-3.5" />
+                            <span>Sports Academy</span>
+                          </span>
 
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {academy.sportsOffered.length > 0 ? (
-                          academy.sportsOffered.map((sport) => (
-                            <span
-                              key={sport}
-                              className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-300"
-                            >
-                              {sport}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-ink-500">Multi-Sport Coaching</span>
+                          <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] font-bold text-ink-300">
+                            {academy.coachesCount} Coach{academy.coachesCount > 1 ? 'es' : ''}
+                          </span>
+                        </div>
+
+                        {/* Title & Lead Coach */}
+                        <div className="mt-4">
+                          <h3 className="font-display text-lg font-bold text-white group-hover:text-blue-300 transition">
+                            {academy.name}
+                          </h3>
+                          <div className="mt-1 flex items-center justify-between text-xs text-ink-300">
+                            <p>
+                              Lead: <strong className="text-white">{academy.headCoachName}</strong>
+                            </p>
+                            {academy.headCoachPhone && (
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] text-ink-400">
+                                <a href={'tel:' + academy.headCoachPhone} className="hover:text-white transition">
+                                  {academy.headCoachPhone}
+                                </a>
+                                {waUrl && (
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400 hover:bg-emerald-500/30 transition"
+                                  >
+                                    WA
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Sports Tags */}
+                        <div className="mt-3.5 flex flex-wrap gap-1.5">
+                          {academy.sportsOffered.length > 0 ? (
+                            academy.sportsOffered.map((sport) => (
+                              <span
+                                key={sport}
+                                className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-300"
+                              >
+                                {sport}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="rounded-lg bg-white/[0.03] px-2 py-0.5 text-[10px] text-ink-500">Multi-Sport Coaching</span>
+                          )}
+                        </div>
+
+                        {/* Metrics Grid */}
+                        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/5 pt-3.5">
+                          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-2.5">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-ink-400 block">Batches</span>
+                            <span className="font-display text-xl font-extrabold text-white">{academy.batchesCount}</span>
+                            <span className="text-[10px] text-ink-500 block">Active Schedules</span>
+                          </div>
+                          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-2.5">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-ink-400 block">Students</span>
+                            <span className="font-display text-xl font-extrabold text-white">{academy.studentsCount}</span>
+                            <span className="text-[10px] text-ink-500 block">Enrolled Athletes</span>
+                          </div>
+                        </div>
+
+                        {academy.locality && (
+                          <div className="mt-3.5 flex items-center gap-1.5 text-xs text-ink-400 border-t border-white/5 pt-3">
+                            <MapPin className="h-3.5 w-3.5 text-ink-400 shrink-0" />
+                            <span>{academy.locality}{academy.pincode ? ' (' + academy.pincode + ')' : ''}</span>
+                          </div>
                         )}
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/5 pt-3 text-xs text-ink-300">
-                        <div>
-                          <span className="text-[10px] text-ink-400 block">Total Batches</span>
-                          <span className="font-bold text-white">{academy.batchesCount}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-ink-400 block">Enrolled Students</span>
-                          <span className="font-bold text-white">{academy.studentsCount}</span>
+                      {/* Coaches Roster */}
+                      <div className="mt-5 border-t border-white/5 pt-4">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-400 mb-2">
+                          Coaches Roster ({academy.coaches.length}):
+                        </p>
+                        <div className="space-y-1.5">
+                          {academy.coaches.map((c) => (
+                            <div
+                              key={c.id}
+                              onClick={() => setSelectedCoach(c)}
+                              className="cursor-pointer flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-xs transition-all hover:border-orange-500/30 hover:bg-white/[0.06]"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="grid h-6 w-6 place-items-center rounded-lg bg-orange-500/15 text-[10px] font-bold text-orange-400">
+                                  {c.name.charAt(0)}
+                                </div>
+                                <span className="text-white font-medium">{c.name}</span>
+                              </div>
+                              <span className="text-orange-400 font-bold flex items-center gap-1 text-[11px]">
+                                <span>Profile</span>
+                                <ArrowUpRight className="h-3 w-3" />
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-
-                      {academy.locality && (
-                        <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-400">
-                          <MapPin className="h-3 w-3 text-ink-400 shrink-0" />
-                          <span>{academy.locality}{academy.pincode ? ' (' + academy.pincode + ')' : ''}</span>
-                        </div>
-                      )}
                     </div>
-
-                    <div className="mt-6 border-t border-white/5 pt-4">
-                      <p className="text-[11px] font-semibold text-ink-400 uppercase tracking-wider mb-2">
-                        Coaches Roster:
-                      </p>
-                      <div className="space-y-1.5">
-                        {academy.coaches.map((c) => (
-                          <div
-                            key={c.id}
-                            onClick={() => setSelectedCoach(c)}
-                            className="cursor-pointer flex items-center justify-between rounded-xl bg-white/[0.02] border border-white/5 px-3 py-1.5 text-xs transition hover:bg-white/[0.08]"
-                          >
-                            <span className="text-white font-medium">{c.name}</span>
-                            <span className="text-orange-400 font-bold flex items-center gap-1 text-[11px]">
-                              <span>Profile</span>
-                              <ArrowUpRight className="h-3 w-3" />
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1862,62 +2053,103 @@ export function AdminPortal() {
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredParents.map((parent) => (
-                  <div
-                    key={parent.phone}
-                    onClick={() => setSelectedParent(parent)}
-                    className="cursor-pointer group rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:border-emerald-500/40 hover:bg-white/[0.06] hover:shadow-2xl"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/20 text-sm font-bold text-emerald-400">
-                          {parent.name.charAt(0)}
-                        </div>
-                        <div>
-                          <h3 className="font-display text-base font-bold text-white group-hover:text-emerald-400 transition">
-                            {parent.name}
-                          </h3>
-                          <p className="text-xs text-ink-400 flex items-center gap-1 mt-0.5 font-mono">
-                            <Phone className="h-3 w-3" />
-                            <span>{parent.phone}</span>
-                          </p>
-                        </div>
-                      </div>
-                      <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-300">
-                        {parent.childrenCount} {parent.childrenCount === 1 ? 'Child' : 'Children'}
-                      </span>
-                    </div>
+                {filteredParents.map((parent) => {
+                  const cleanPhone = (parent.phone || '').replace(/\D/g, '');
+                  const waUrl = cleanPhone ? 'https://wa.me/91' + cleanPhone : null;
 
-                    <div className="mt-5 border-t border-white/5 pt-4">
-                      <span className="text-[11px] font-semibold text-ink-400 uppercase tracking-wider block mb-2">
-                        Linked Athletes:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {parent.childrenNames.length > 0 ? (
-                          parent.childrenNames.map((cName) => (
-                            <span
-                              key={cName}
-                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-white flex items-center gap-1"
-                            >
-                              <span>🏅</span>
-                              <span>{cName}</span>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-ink-500">No athletes linked</span>
+                  return (
+                    <div
+                      key={parent.phone}
+                      onClick={() => setSelectedParent(parent)}
+                      className="cursor-pointer group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] via-white/[0.015] to-transparent p-6 sm:p-7 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:border-emerald-500/40 hover:bg-emerald-500/[0.02] hover:shadow-2xl hover:shadow-emerald-950/20"
+                    >
+                      {/* Top status accent line */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+
+                      <div>
+                        {/* Parent Identity & Children Count */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-base font-extrabold text-emerald-400 ring-1 ring-emerald-500/30 shadow-md">
+                              {parent.name.charAt(0)}
+                            </div>
+                            <div>
+                              <h3 className="font-display text-base font-bold text-white group-hover:text-emerald-300 transition">
+                                {parent.name}
+                              </h3>
+                              <p className="text-xs text-ink-400 flex items-center gap-1 mt-0.5 font-mono">
+                                <Phone className="h-3 w-3" />
+                                <span>{parent.phone}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-extrabold text-emerald-300">
+                            {parent.childrenCount} {parent.childrenCount === 1 ? 'Child' : 'Children'}
+                          </span>
+                        </div>
+
+                        {/* Athletes Roster Chips */}
+                        <div className="mt-4 border-t border-white/5 pt-3.5">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-ink-400 block mb-2">
+                            Linked Athletes:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {parent.childrenNames.length > 0 ? (
+                              parent.childrenNames.map((cName) => (
+                                <span
+                                  key={cName}
+                                  className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-white flex items-center gap-1.5 hover:border-emerald-500/30 transition"
+                                >
+                                  <span className="text-emerald-400">🏅</span>
+                                  <span>{cName}</span>
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-xs text-ink-500">No athletes linked</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {parent.locality && (
+                          <div className="mt-3.5 flex items-center gap-1.5 text-xs text-ink-400 border-t border-white/5 pt-3">
+                            <MapPin className="h-3.5 w-3.5 text-ink-400 shrink-0" />
+                            <span>{parent.locality}{parent.pincode ? ' (' + parent.pincode + ')' : ''}</span>
+                          </div>
                         )}
                       </div>
-                    </div>
 
-                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-ink-400">
-                      <span>{parent.locality || 'Hyderabad'}</span>
-                      <span className="text-emerald-400 font-bold group-hover:translate-x-0.5 transition flex items-center gap-1">
-                        <span>View Family Profile</span>
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </span>
+                      {/* Footer Actions */}
+                      <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setSelectedParent(parent)}
+                          className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1"
+                        >
+                          <span>Family Profile</span>
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          {waUrl && (
+                            <a
+                              href={waUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/25 transition"
+                            >
+                              WhatsApp
+                            </a>
+                          )}
+                          <a
+                            href={'tel:' + parent.phone}
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-ink-300 hover:bg-white/[0.08] hover:text-white transition"
+                          >
+                            Call
+                          </a>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1937,14 +2169,21 @@ export function AdminPortal() {
         {/* TAB: WHATSAPP TEMPLATES */}
         {activeTab === 'whatsapp' && <WhatsAppTemplatesDashboard />}
 
+        {activeTab === 'pushtemplates' && <PushTemplatesDashboard />}
+
+        {activeTab === 'bulkimport' && <BulkStudentImportDashboard coaches={coaches} />}
+
+        {activeTab === 'paymentnotifications' && (
+          <PaymentNotificationsDashboard coaches={coaches} isSuperAdmin={!!adminUser?.isSuperAdmin} />
+        )}
+
+        {activeTab === 'whatsappinbox' && <WhatsAppInboxDashboard isSuperAdmin={!!adminUser?.isSuperAdmin} />}
+
         {/* TAB: MESSAGE LOGS */}
         {activeTab === 'messagelogs' && <MessageLogsDashboard coaches={coaches} parents={parents} />}
 
         {/* TAB: ACCOUNT DELETION REQUESTS */}
         {activeTab === 'deletionrequests' && <AccountDeletionRequestsDashboard />}
-
-
-        {activeTab === 'whatsappbot' && <WhatsAppBotDashboard />}
 
         {/* TAB 5: ADMISSIONS & TRIALS */}
         {activeTab === 'admissions' && (
@@ -2021,21 +2260,86 @@ export function AdminPortal() {
 
         {/* TAB 6: SUPPORT DESK */}
         {activeTab === 'tickets' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">
-                Support &amp; Grievance Desk ({tickets.length})
-              </h2>
-              <p className="mt-1 text-sm text-ink-400">
-                Track and resolve support tickets submitted by coaches and guardians.
-              </p>
+          <div className="space-y-7">
+            {/* Desk Header */}
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3.5 py-1 text-xs font-bold text-sky-400 backdrop-blur mb-2">
+                  <LifeBuoy className="h-3.5 w-3.5" />
+                  <span>Platform Resolution Desk</span>
+                </div>
+                <h2 className="font-display text-2xl font-extrabold text-white sm:text-3xl tracking-tight">
+                  Support &amp; Grievances
+                </h2>
+                <p className="mt-1 text-sm text-ink-400">
+                  Direct customer support queue. Inquiries submitted via mobile apps and web portals appear here in real time.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={fetchPlatformData}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-bold text-white hover:bg-white/[0.08] transition"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
+                  <span>Refresh Queue</span>
+                </button>
+              </div>
             </div>
 
-            {/* Role filter + Sort controls */}
+            {/* Support Desk KPI Summary Strip */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-5 backdrop-blur-xl">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-ink-400">Total Inquiries</span>
+                <p className="mt-2 font-display text-3xl font-extrabold text-white tracking-tight">{tickets.length}</p>
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-ink-400">
+                  <Clock className="h-3.5 w-3.5 text-sky-400" />
+                  <span>All logged submissions</span>
+                </div>
+              </div>
+
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-transparent to-transparent p-5 backdrop-blur-xl shadow-lg shadow-amber-950/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">Pending Attention</span>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                </div>
+                <p className="mt-2 font-display text-3xl font-extrabold text-amber-300 tracking-tight">
+                  {tickets.filter((t) => t.status === 'open').length}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-300/80">
+                  <span>Awaiting superadmin response</span>
+                </div>
+              </div>
+
+              <div className="relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-b from-blue-500/10 via-transparent to-transparent p-5 backdrop-blur-xl">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-400">In Progress</span>
+                <p className="mt-2 font-display text-3xl font-extrabold text-blue-300 tracking-tight">
+                  {tickets.filter((t) => t.status === 'in_progress').length}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-300/80">
+                  <span>Actively being resolved</span>
+                </div>
+              </div>
+
+              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent p-5 backdrop-blur-xl">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">Resolved Cases</span>
+                <p className="mt-2 font-display text-3xl font-extrabold text-emerald-300 tracking-tight">
+                  {tickets.filter((t) => t.status === 'resolved').length}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-300/80">
+                  <span>Successfully closed issues</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Sort Bar */}
             <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 {[
-                  { id: 'all', label: 'All', count: tickets.length },
+                  { id: 'all', label: 'All Roles', count: tickets.length },
                   { id: 'parent', label: 'Parents', count: tickets.filter((t) => t.role === 'parent').length },
                   { id: 'coach', label: 'Coaches', count: tickets.filter((t) => t.role === 'coach').length },
                   { id: 'other', label: 'Other', count: tickets.filter((t) => t.role === 'other').length },
@@ -2043,10 +2347,12 @@ export function AdminPortal() {
                   <button
                     key={f.id}
                     onClick={() => setTicketRoleFilter(f.id as any)}
-                    className={'rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ' +
+                    className={
+                      'rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ' +
                       (ticketRoleFilter === f.id
-                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                        : 'bg-white/[0.04] text-ink-300 hover:bg-white/[0.08]')}
+                        ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25'
+                        : 'bg-white/[0.04] text-ink-300 hover:bg-white/[0.08] hover:text-white')
+                    }
                   >
                     {f.label} ({f.count})
                   </button>
@@ -2062,8 +2368,12 @@ export function AdminPortal() {
                     <button
                       key={s.id}
                       onClick={() => setTicketSortBy(s.id as any)}
-                      className={'rounded-lg px-3 py-1.5 text-xs font-bold transition-all ' +
-                        (ticketSortBy === s.id ? 'bg-blue-600 text-white shadow-md' : 'text-ink-400 hover:bg-white/[0.06]')}
+                      className={
+                        'rounded-lg px-3 py-1.5 text-xs font-bold transition-all ' +
+                        (ticketSortBy === s.id
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-ink-400 hover:bg-white/[0.06] hover:text-white')
+                      }
                     >
                       Sort by {s.label}
                     </button>
@@ -2071,104 +2381,216 @@ export function AdminPortal() {
                 </div>
                 <button
                   onClick={() => setTicketSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-ink-300 hover:bg-white/[0.08]"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-bold text-ink-300 hover:bg-white/[0.08] hover:text-white transition"
                   title={ticketSortDir === 'asc' ? 'Ascending' : 'Descending'}
                 >
                   <ArrowUpDown className="h-3.5 w-3.5" />
-                  {ticketSortDir === 'asc' ? 'Oldest / A→Z' : 'Newest / Z→A'}
+                  <span>{ticketSortDir === 'asc' ? 'Oldest / A→Z' : 'Newest / Z→A'}</span>
                 </button>
               </div>
             </div>
 
             {filteredSortedTickets.length === 0 ? (
-              <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-16 text-center">
-                <HelpCircle className="mx-auto h-12 w-12 text-ink-500" />
-                <p className="mt-4 text-sm font-bold text-white">
-                  {tickets.length === 0 ? 'Support queue is clear' : 'No tickets match this filter'}
+              <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-20 text-center">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/[0.03] border border-white/10 text-ink-500">
+                  <LifeBuoy className="h-8 w-8 text-ink-400" />
+                </div>
+                <p className="mt-4 text-base font-bold text-white">
+                  {tickets.length === 0 ? 'Support queue is completely clear' : 'No tickets match selected filter'}
                 </p>
-                <p className="mt-1 text-xs text-ink-400">
+                <p className="mt-1 text-xs text-ink-400 max-w-md mx-auto">
                   {tickets.length === 0
-                    ? 'No open complaints or inquiries reported.'
-                    : 'Try a different role filter.'}
+                    ? 'All complaints, inquiries, and grievances submitted by academy coaches and parents have been addressed.'
+                    : 'Try selecting "All Roles" or clearing the sort filter.'}
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {filteredSortedTickets.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded bg-orange-500/20 px-2.5 py-0.5 text-[11px] font-bold uppercase text-orange-400">
-                            {t.category}
-                          </span>
+              <div className="grid gap-5 sm:grid-cols-2">
+                {filteredSortedTickets.map((t) => {
+                  const cleanPhone = (t.userPhone || '').replace(/\D/g, '');
+                  const waUrl = cleanPhone
+                    ? 'https://wa.me/91' + cleanPhone + '?text=' + encodeURIComponent('Hi ' + (t.userName || 'there') + ', this is TruCoach Super Admin regarding your support request #' + t.id.slice(0, 8) + ' (' + t.subject + ').')
+                    : null;
+
+                  return (
+                    <div
+                      key={t.id}
+                      className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] via-white/[0.02] to-transparent p-6 sm:p-7 backdrop-blur-xl shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl"
+                    >
+                      {/* Top status accent bar */}
+                      <div
+                        className={
+                          'absolute top-0 left-0 right-0 h-1 ' +
+                          (t.status === 'open'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                            : t.status === 'in_progress'
+                            ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-500')
+                        }
+                      />
+
+                      <div>
+                        {/* Status + Category Row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-lg border border-orange-500/30 bg-orange-500/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-orange-400">
+                              {t.category || 'General'}
+                            </span>
+                            <span
+                              className={
+                                'rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ' +
+                                (t.role === 'parent'
+                                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                                  : t.role === 'coach'
+                                  ? 'border-blue-500/30 bg-blue-500/15 text-blue-300'
+                                  : 'border-white/20 bg-white/10 text-ink-300')
+                              }
+                            >
+                              {t.role}
+                            </span>
+                          </div>
+
                           <span
-                            className={'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ' +
-                              (t.role === 'parent'
-                                ? 'bg-emerald-500/15 text-emerald-400'
-                                : t.role === 'coach'
-                                ? 'bg-blue-500/15 text-blue-400'
-                                : 'bg-white/10 text-ink-300')}
+                            className={
+                              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ' +
+                              (t.status === 'open'
+                                ? 'border-amber-500/30 bg-amber-500/20 text-amber-300 shadow-sm shadow-amber-500/20'
+                                : t.status === 'in_progress'
+                                ? 'border-blue-500/30 bg-blue-500/20 text-blue-300 shadow-sm shadow-blue-500/20'
+                                : 'border-emerald-500/30 bg-emerald-500/20 text-emerald-300')
+                            }
                           >
-                            {t.role}
+                            {t.status === 'open' && (
+                              <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400"></span>
+                              </span>
+                            )}
+                            {t.status === 'in_progress' && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                            )}
+                            {t.status === 'resolved' && (
+                              <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                            )}
+                            <span>{t.status.replace('_', ' ')}</span>
                           </span>
                         </div>
-                        <span
-                          className={'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ' +
-                            (t.status === 'open'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : t.status === 'in_progress'
-                              ? 'bg-blue-500/20 text-blue-300'
-                              : 'bg-emerald-500/20 text-emerald-300')}
-                        >
-                          {t.status}
-                        </span>
+
+                        {/* Subject & Description */}
+                        <h3 className="mt-4 font-display text-lg font-bold text-white group-hover:text-orange-300 transition-colors">
+                          {t.subject}
+                        </h3>
+                        <p className="mt-2 text-xs leading-relaxed text-ink-300 whitespace-pre-wrap rounded-xl border border-white/5 bg-white/[0.015] p-3">
+                          {t.message}
+                        </p>
+
+                        {/* Reporter & Contact Card */}
+                        <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.02] p-3 text-xs text-ink-300 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-ink-400 text-[11px]">Reporter:</span>
+                            <span className="font-bold text-white">{t.userName} ({t.role})</span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-ink-400 text-[11px]">Phone:</span>
+                            <div className="flex items-center gap-2">
+                              {t.userPhone ? (
+                                <>
+                                  <a
+                                    href={'tel:' + t.userPhone}
+                                    className="font-mono text-ink-200 hover:text-white underline decoration-white/20"
+                                  >
+                                    {t.userPhone}
+                                  </a>
+                                  {waUrl && (
+                                    <a
+                                      href={waUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/30 transition"
+                                      title="Open WhatsApp chat with user"
+                                    >
+                                      <MessageCircle className="h-3 w-3" />
+                                      <span>WA</span>
+                                    </a>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-ink-500">Not provided</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {t.userEmail && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-ink-400 text-[11px]">Email:</span>
+                              <a
+                                href={'mailto:' + t.userEmail}
+                                className="text-ink-300 hover:text-white underline decoration-white/20 truncate max-w-[200px]"
+                              >
+                                {t.userEmail}
+                              </a>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[11px] text-ink-400">
+                            <span className="flex items-center gap-1 font-mono">
+                              <Hash className="h-3 w-3 text-ink-500" />
+                              <span>{t.id.slice(0, 13)}...</span>
+                            </span>
+                            <span>{t.createdAt ? new Date(t.createdAt).toLocaleString() : 'N/A'}</span>
+                          </div>
+                        </div>
                       </div>
 
-                      <h3 className="mt-4 font-display text-base font-bold text-white">{t.subject}</h3>
-                      <p className="mt-2 text-xs leading-relaxed text-ink-300">{t.message}</p>
+                      {/* Ticket Action Footer */}
+                      <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4">
+                        <div className="flex items-center gap-2">
+                          {waUrl && (
+                            <a
+                              href={waUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              <span>WhatsApp</span>
+                            </a>
+                          )}
+                          {t.userPhone && (
+                            <a
+                              href={'tel:' + t.userPhone}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-ink-300 hover:bg-white/[0.08] hover:text-white transition"
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                              <span>Call</span>
+                            </a>
+                          )}
+                        </div>
 
-                      <div className="mt-4 border-t border-white/5 pt-3 text-xs text-ink-400 space-y-1">
-                        <p>
-                          <strong className="text-white">Reporter:</strong> {t.userName} ({t.role})
-                        </p>
-                        <p>
-                          <strong className="text-white">Contact:</strong> {t.userPhone} {t.userEmail ? ' · ' + t.userEmail : ''}
-                        </p>
-                        <p className="flex items-center gap-1.5">
-                          <Hash className="h-3 w-3 text-ink-500" />
-                          <span className="font-mono text-ink-500">{t.id}</span>
-                        </p>
-                        <p>
-                          <strong className="text-white">Raised:</strong>{' '}
-                          {t.createdAt ? new Date(t.createdAt).toLocaleString() : 'N/A'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {t.status !== 'in_progress' && t.status !== 'resolved' && (
+                            <button
+                              onClick={() => handleUpdateTicketStatus(t.id, 'in_progress')}
+                              className="rounded-xl border border-blue-500/30 bg-blue-500/15 px-3 py-1.5 text-xs font-bold text-blue-300 hover:bg-blue-500/25 transition shadow-sm"
+                            >
+                              In Progress
+                            </button>
+                          )}
+                          {t.status !== 'resolved' && (
+                            <button
+                              onClick={() => handleUpdateTicketStatus(t.id, 'resolved')}
+                              className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-3.5 py-1.5 text-xs font-bold text-white hover:from-emerald-600 hover:to-teal-700 transition shadow-lg shadow-emerald-500/20"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Resolve</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-
-                    <div className="mt-6 flex items-center justify-end gap-2 border-t border-white/5 pt-4">
-                      {t.status !== 'in_progress' && t.status !== 'resolved' && (
-                        <button
-                          onClick={() => handleUpdateTicketStatus(t.id, 'in_progress')}
-                          className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-400 hover:bg-blue-500/20"
-                        >
-                          In Progress
-                        </button>
-                      )}
-                      {t.status !== 'resolved' && (
-                        <button
-                          onClick={() => handleUpdateTicketStatus(t.id, 'resolved')}
-                          className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20"
-                        >
-                          Mark Resolved
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2182,7 +2604,17 @@ export function AdminPortal() {
 
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            <PlatformSettingsDashboard config={platformConfig} onSaved={(updated) => setPlatformConfig(updated)} />
+            {adminUser?.isSuperAdmin ? (
+              <PlatformSettingsDashboard config={platformConfig} onSaved={(updated) => setPlatformConfig(updated)} />
+            ) : (
+              <div className="flex flex-col items-center gap-2 rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-10 text-center">
+                <ShieldAlert className="h-7 w-7 text-ink-500" />
+                <p className="text-sm font-semibold text-white">Super Admin access required</p>
+                <p className="text-xs text-ink-400">Platform-wide settings can only be changed by a Super Admin.</p>
+              </div>
+            )}
+            <FeatureFlagsDashboard isSuperAdmin={!!adminUser?.isSuperAdmin} />
+            <BroadcastDashboard isSuperAdmin={!!adminUser?.isSuperAdmin} />
             <AdminAccountDashboard adminUser={adminUser} />
           </div>
         )}

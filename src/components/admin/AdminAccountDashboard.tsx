@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldPlus, KeyRound, Loader2, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ShieldPlus, KeyRound, Loader2, CheckCircle2, ShieldCheck, ShieldQuestion } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { AdminUser } from '@/lib/supabase';
 
@@ -51,6 +51,7 @@ export function AdminAccountDashboard({ adminUser }: AdminAccountDashboardProps)
   const [newPhone, setNewPhone] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [newRole, setNewRole] = useState<'admin' | 'superadmin'>('admin');
   const [addStage, setAddStage] = useState<FlowStage>('form');
   const [addOtpInput, setAddOtpInput] = useState('');
   const [addGeneratedOtp, setAddGeneratedOtp] = useState('');
@@ -112,6 +113,7 @@ export function AdminAccountDashboard({ adminUser }: AdminAccountDashboardProps)
           p_email: newEmail.trim(),
           p_phone: newPhone.replace(/\D/g, ''),
           p_password: newPassword,
+          p_role: newRole,
         },
       });
       if (error || data?.error) {
@@ -123,6 +125,7 @@ export function AdminAccountDashboard({ adminUser }: AdminAccountDashboardProps)
       setNewPhone('');
       setNewPassword('');
       setNewPasswordConfirm('');
+      setNewRole('admin');
       setAddOtpInput('');
       setAddGeneratedOtp('');
     } catch (err: any) {
@@ -227,7 +230,13 @@ export function AdminAccountDashboard({ adminUser }: AdminAccountDashboardProps)
           </div>
         </div>
 
-        {addStage === 'done' ? (
+        {!adminUser?.isSuperAdmin ? (
+          <div className="mt-5 flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-8 text-center">
+            <ShieldQuestion className="h-7 w-7 text-ink-500" />
+            <p className="text-sm font-semibold text-white">Super Admin access required</p>
+            <p className="text-xs text-ink-400">Only Super Admins can create new admin accounts.</p>
+          </div>
+        ) : addStage === 'done' ? (
           <div className="mt-5 flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-8 text-center">
             <CheckCircle2 className="h-8 w-8 text-emerald-400" />
             <p className="text-sm font-semibold text-white">Admin account created.</p>
@@ -312,6 +321,40 @@ export function AdminAccountDashboard({ adminUser }: AdminAccountDashboardProps)
               type="password"
               className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-ink-600 focus:border-cyan-500/50 focus:outline-none"
             />
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-ink-400">
+                Access Tier
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNewRole('admin')}
+                  className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                    newRole === 'admin'
+                      ? 'border-cyan-500/60 bg-cyan-500/15 text-cyan-300'
+                      : 'border-white/10 bg-white/[0.02] text-ink-400 hover:text-white'
+                  }`}
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewRole('superadmin')}
+                  className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                    newRole === 'superadmin'
+                      ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+                      : 'border-white/10 bg-white/[0.02] text-ink-400 hover:text-white'
+                  }`}
+                >
+                  Super Admin
+                </button>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-ink-500">
+                {newRole === 'superadmin'
+                  ? 'Full root access — can also create admins and change platform-wide settings.'
+                  : "Day-to-day access — coaches, parents, tickets. Can't create admins or change platform settings."}
+              </p>
+            </div>
             {addError && <p className="text-xs font-medium text-rose-400">{addError}</p>}
             <button
               onClick={handleRequestAddAdmin}

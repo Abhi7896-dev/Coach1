@@ -20,6 +20,8 @@ type FormState = {
   max_location_changes: string;
   location_change_window_days: string;
   otp_mandatory_for_location: boolean;
+  min_app_version_android: string;
+  min_app_version_ios: string;
 };
 
 function toFormState(c: PlatformConfig | null): FormState {
@@ -35,6 +37,8 @@ function toFormState(c: PlatformConfig | null): FormState {
     max_location_changes: String(c?.max_location_changes ?? ''),
     location_change_window_days: String(c?.location_change_window_days ?? ''),
     otp_mandatory_for_location: c?.otp_mandatory_for_location ?? true,
+    min_app_version_android: c?.min_app_version_android || '',
+    min_app_version_ios: c?.min_app_version_ios || '',
   };
 }
 
@@ -68,13 +72,16 @@ export function PlatformSettingsDashboard({ config, onSaved }: PlatformSettingsD
         max_location_changes: numOrNull(form.max_location_changes),
         location_change_window_days: numOrNull(form.location_change_window_days),
         otp_mandatory_for_location: form.otp_mandatory_for_location,
+        min_app_version_android: form.min_app_version_android.trim() || null,
+        min_app_version_ios: form.min_app_version_ios.trim() || null,
         updated_at: new Date().toISOString(),
       };
 
-      // Direct write — platform_config already has an admin-only RLS policy
-      // ("Only admins can update platform config", gated on get_my_role() =
-      // 'admin'), so no extra edge function round trip is needed just to
-      // apply a settings change.
+      // Direct write — platform_config has a superadmin-only RLS policy
+      // ("Only superadmins can update platform config", gated on
+      // get_my_role() = 'superadmin'), so no extra edge function round trip
+      // is needed just to apply a settings change. A plain 'admin' caller's
+      // write is silently rejected by RLS, not just hidden client-side.
       const { data, error } = await supabase.from('platform_config').update(payload).eq('id', 'global').select().single();
       if (error) {
         setErrorMsg(error.message);
@@ -178,6 +185,18 @@ export function PlatformSettingsDashboard({ config, onSaved }: PlatformSettingsD
             />
             Require OTP verification for location changes
           </label>
+        </div>
+
+        <div className="border-t border-white/5 pt-5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400 mb-3">Minimum App Version</h3>
+          <p className="text-[11px] text-ink-500 mb-3">
+            Configured here, but not enforced yet — the mobile app doesn't check these against its own build number.
+            Enforcing a forced update is a separate Flutter-side change.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {field('Android (e.g. 1.0.3)', 'min_app_version_android')}
+            {field('iOS (e.g. 1.0.3)', 'min_app_version_ios')}
+          </div>
         </div>
 
         <div className="border-t border-white/5 pt-5">

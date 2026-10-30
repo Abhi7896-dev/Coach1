@@ -18,22 +18,23 @@ const COLS = [
       { label: 'Live Attendance', href: '#parents' },
       { label: 'Progress Remarks', href: '#parents' },
       { label: 'Digital Receipts', href: '#parents' },
-      { label: 'Discover Academies', href: '#community' },
+      { label: 'Discover Academies', href: '/academies' },
     ],
   },
   {
     title: 'Company',
     links: [
       { label: 'About Us', href: '#about' },
-      { label: 'Security', href: '#security' },
+      { label: 'Why TruCoach', href: '#security' },
       { label: 'Contact', href: '/policies.html#contact' },
       { label: 'Delete Account', href: '/delete-account' },
-      { label: 'Admin Console', href: '/login/admin' },
+      // { label: 'Admin Console', href: '/login/admin' },
     ],
   },
 ];
 
 const SOCIALS = [Twitter, Instagram, Linkedin, Youtube];
+const SUPPORT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || 'support@trucoach.co.in';
 
 export function Footer() {
   return (
@@ -102,10 +103,10 @@ export function Footer() {
                 For any queries, support, or partnership opportunities, feel free to reach out to us:
               </p>
               <a
-                href={`mailto:${import.meta.env.VITE_CONTACT_EMAIL}`}
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="inline-flex text-sm font-semibold text-orange-600 transition-colors hover:text-orange-700"
               >
-                {import.meta.env.VITE_CONTACT_EMAIL}
+                {SUPPORT_EMAIL}
               </a>
             </div>
           </div>
@@ -119,7 +120,8 @@ export function Footer() {
             <a href="/policies.html#privacy" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Privacy Policy</a>
             <a href="/policies.html#terms" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Terms of Service</a>
             <a href="/policies.html#refunds" target="_blank" rel="noopener noreferrer" className="hover:text-ink-700">Refund Policy</a>
-            <Link to="/delete-account" className="hover:text-orange-600 font-medium">Delete Account</Link>`r`n            <Link to="/login/admin" className="hover:text-orange-600 font-medium">Admin Portal</Link>
+            <Link to="/delete-account" className="hover:text-orange-600 font-medium">Delete Account</Link>
+            <Link to="/login/admin" className="hover:text-orange-600 font-medium">Login</Link>
             <span className="inline-flex items-center gap-1.5">
               <Zap className="h-3.5 w-3.5 text-orange-500" />
               Built for Champions.

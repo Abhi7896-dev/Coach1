@@ -30,6 +30,10 @@ import {
   AlertTriangle,
   Landmark,
   Save,
+  Globe,
+  Loader2,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { CoachItem } from '@/pages/AdminPortal';
@@ -128,6 +132,64 @@ export function CoachProfileModal({
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
   const [isConfirmingRoleChange, setIsConfirmingRoleChange] = useState(false);
+
+  // Public profile visibility — platform-admin-only; the coach has no field
+  // or screen anywhere in the app to see or change this themselves. Fetched
+  // directly rather than threaded through the admin portal's bulk coach
+  // list, since it's a rarely-touched, modal-local control.
+  const [publicProfileEnabled, setPublicProfileEnabled] = useState<boolean | null>(null);
+  const [togglingPublicProfile, setTogglingPublicProfile] = useState(false);
+  const [publicProfileError, setPublicProfileError] = useState<string | null>(null);
+  const [publicLinkCopied, setPublicLinkCopied] = useState(false);
+
+  // Wherever this admin portal is actually running right now — localhost
+  // during local dev, the real domain once deployed — never a hardcoded
+  // production URL that would be wrong in every environment except prod.
+  const publicProfileUrl = `${window.location.origin}/coach/${coach?.id || ''}`;
+  const handleCopyPublicLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+      setPublicLinkCopied(true);
+      setTimeout(() => setPublicLinkCopied(false), 2000);
+    } catch {
+      // clipboard blocked — nothing further to do silently
+    }
+  };
+
+  useEffect(() => {
+    if (!coach) return;
+    let cancelled = false;
+    supabase
+      .from('tutors')
+      .select('public_profile_enabled')
+      .eq('id', coach.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setPublicProfileEnabled(data?.public_profile_enabled ?? false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [coach?.id]);
+
+  const handleTogglePublicProfile = async () => {
+    if (!coach || publicProfileEnabled === null || togglingPublicProfile) return;
+    const next = !publicProfileEnabled;
+    setTogglingPublicProfile(true);
+    setPublicProfileError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'toggle_coach_public_profile', user_id: coach.id, enabled: next },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setPublicProfileEnabled(next);
+    } catch (err: any) {
+      setPublicProfileError(err?.message || 'Failed to update public profile visibility.');
+    } finally {
+      setTogglingPublicProfile(false);
+    }
+  };
 
   // Easebuzz Settlement Configuration State
   const [subMerchantId, setSubMerchantId] = useState('');
@@ -1623,6 +1685,90 @@ export function CoachProfileModal({
               >
                 Revoke / Reject
               </button>
+            )}
+          </div>
+
+          {/* Public profile visibility — admin-only, no coach-side control */}
+          <div
+            className={`mt-4 overflow-hidden rounded-2xl border transition-colors ${
+              publicProfileEnabled ? 'border-emerald-500/30 bg-emerald-500/[0.06]' : 'border-white/10 bg-white/5'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors ${
+                    publicProfileEnabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-ink-400'
+                  }`}
+                >
+                  <Globe className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-white">Public Website Profile</p>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                        publicProfileEnabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-ink-500'
+                      }`}
+                    >
+                      {publicProfileEnabled === null ? '...' : publicProfileEnabled ? 'Live' : 'Hidden'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-ink-400">
+                    Admin-only — the coach has no control over this.{' '}
+                    {coach?.academyId
+                      ? `When on, they appear in ${coach.academyName || 'their academy'}'s public roster — no separate page.`
+                      : 'When on, they get their own standalone public profile page.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleTogglePublicProfile}
+                disabled={publicProfileEnabled === null || togglingPublicProfile}
+                className={`relative h-7 w-[3.25rem] shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  publicProfileEnabled ? 'bg-emerald-500' : 'bg-white/15'
+                }`}
+                aria-label="Toggle public profile visibility"
+              >
+                <span
+                  className={`absolute top-0.5 grid h-6 w-6 place-items-center rounded-full bg-white shadow-md transition-transform ${
+                    publicProfileEnabled ? 'translate-x-[1.65rem]' : 'translate-x-0.5'
+                  }`}
+                >
+                  {togglingPublicProfile ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-500" />
+                  ) : publicProfileEnabled ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5 text-ink-400" />
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {publicProfileError && (
+              <p className="border-t border-white/10 px-4 py-2 text-[11px] text-rose-400">{publicProfileError}</p>
+            )}
+
+            {publicProfileEnabled && !coach?.academyId && (
+              <div className="flex items-center justify-between gap-3 border-t border-emerald-500/20 bg-black/10 px-4 py-2.5">
+                <p className="truncate text-[11px] font-medium text-emerald-200/80">{publicProfileUrl}</p>
+                <button
+                  onClick={handleCopyPublicLink}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-300 transition-colors hover:bg-emerald-500/25"
+                >
+                  {publicLinkCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {publicLinkCopied ? 'Copied' : 'Copy Link'}
+                </button>
+              </div>
+            )}
+            {publicProfileEnabled && coach?.academyId && (
+              <div className="border-t border-emerald-500/20 bg-black/10 px-4 py-2.5">
+                <p className="truncate text-[11px] font-medium text-emerald-200/80">
+                  Visible on {coach.academyName || 'the academy'}'s public page — not a separate link.
+                </p>
+              </div>
             )}
           </div>
         </div>
