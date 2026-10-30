@@ -27,7 +27,16 @@ export function Navbar() {
   const active = useActiveSection(['coaches', 'parents', 'community', 'about', 'security']);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrolled(window.scrollY > 12);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -64,7 +73,7 @@ export function Navbar() {
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
         isSolidHeader
-          ? 'border-b border-ink-100 bg-white/95 backdrop-blur-xl shadow-xs'
+          ? 'border-b border-ink-100 bg-white/95 backdrop-blur-md sm:backdrop-blur-xl shadow-xs'
           : 'border-b border-transparent bg-transparent'
       }`}
     >
@@ -136,7 +145,7 @@ export function Navbar() {
         }`}
       >
         <div
-          className={`absolute inset-x-0 top-16 origin-top border-b border-ink-100 bg-white/95 backdrop-blur-xl transition-all duration-300 sm:top-[72px] ${
+          className={`absolute inset-x-0 top-16 origin-top border-b border-ink-100 bg-white/98 sm:bg-white/95 backdrop-blur-none sm:backdrop-blur-xl transition-all duration-300 sm:top-[72px] ${
             open ? 'scale-y-100 opacity-100' : 'scale-y-95 opacity-0'
           }`}
           style={{ transformOrigin: 'top' }}

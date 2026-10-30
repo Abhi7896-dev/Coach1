@@ -52,7 +52,7 @@ export function Security() {
                 key={d.title}
                 spotlightColor="rgba(25, 176, 98, 0.16)"
                 glowColor="rgba(25, 176, 98, 0.45)"
-                className="group border border-white/10 bg-white/[0.04] p-7 backdrop-blur transition-all duration-300 hover:border-green-400/30 hover:bg-white/[0.07]"
+                className="group border border-white/10 bg-white/[0.04] p-7 backdrop-blur-none sm:backdrop-blur transition-all duration-300 hover:border-green-400/30 hover:bg-white/[0.07]"
               >
                 <span className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-green-400 to-blue-400 transition-transform duration-300 group-hover:scale-x-100" />
                 <span className="grid h-12 w-12 place-items-center rounded-xl bg-green-500/15 text-green-300 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:bg-green-400 group-hover:text-green-950">

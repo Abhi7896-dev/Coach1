@@ -55,6 +55,9 @@ export function ForCoaches() {
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    // Only run scrub zoom on desktop/tablet where GPU and mouse scroll can handle it cleanly
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) return;
+
     const ctx = gsap.context(() => {
       gsap.to('.coach-image-zoom', {
         scale: 1.15,
@@ -104,7 +107,7 @@ export function ForCoaches() {
               </div>
 
               {/* Marketplace discovery card */}
-              <div className="absolute -right-3 -top-4 w-48 rounded-2xl border border-ink-100 bg-white/95 p-3.5 shadow-glow backdrop-blur-md sm:-right-6 lg:-right-8 animate-float-slow">
+              <div className="absolute -right-3 -top-4 w-48 rounded-2xl border border-ink-100 bg-white/95 p-3.5 shadow-glow backdrop-blur-none sm:backdrop-blur-md sm:-right-6 lg:-right-8 sm:animate-float-slow">
                 <div className="flex items-center justify-between text-xs font-semibold text-ink-900">
                   <span className="flex items-center gap-1.5">
                     <Store className="h-4 w-4 text-orange-500" />

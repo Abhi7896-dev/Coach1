@@ -19,6 +19,7 @@ export function SpotlightCard({
   const [pos, setPos] = useState({ x: 0, y: 0, opacity: 0 });
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof window === 'undefined' || !window.matchMedia('(pointer: fine)').matches) return;
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     setPos({
@@ -29,6 +30,7 @@ export function SpotlightCard({
   };
 
   const handleMouseLeave = () => {
+    if (typeof window === 'undefined' || !window.matchMedia('(pointer: fine)').matches) return;
     setPos((prev) => ({ ...prev, opacity: 0 }));
   };
 

@@ -53,12 +53,12 @@ export function CategoryStrip() {
 
       {/* Stream 1: Infinite flowing sports marquee (Left) */}
       <div className="mask-fade-x relative mt-4 overflow-hidden py-2">
-        <div className="flex w-max animate-marquee gap-3 pause-hover">
+        <div className="flex w-max animate-marquee gap-3 pause-hover [will-change:transform] [transform:translateZ(0)]">
           {[...CATEGORIES, ...CATEGORIES, ...CATEGORIES].map((c, i) => (
             <motion.div
               key={`${c.label}-${i}`}
               whileHover={{ scale: 1.05, y: -2 }}
-              className="group inline-flex cursor-pointer items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.06] py-2 pl-2 pr-5 backdrop-blur-md transition-all duration-300 hover:border-orange-400/50 hover:bg-white/[0.12]"
+              className="group inline-flex cursor-pointer items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.08] sm:bg-white/[0.06] py-2 pl-2 pr-5 backdrop-blur-none sm:backdrop-blur-md transition-all duration-300 hover:border-orange-400/50 hover:bg-white/[0.12]"
             >
               <span className={`grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br ${c.color} text-white shadow-sm transition-transform duration-300 group-hover:rotate-6`}>
                 <c.icon className="h-4 w-4" />
@@ -73,11 +73,11 @@ export function CategoryStrip() {
 
       {/* Stream 2: Dynamic ecosystem perks flowing reverse (Right) */}
       <div className="mask-fade-x relative mt-3 overflow-hidden py-1">
-        <div className="flex w-max animate-marquee-reverse gap-3 pause-hover">
+        <div className="flex w-max animate-marquee-reverse gap-3 pause-hover [will-change:transform] [transform:translateZ(0)]">
           {[...ECOSYSTEM_PERKS, ...ECOSYSTEM_PERKS, ...ECOSYSTEM_PERKS].map((p, i) => (
             <div
               key={`${p.text}-${i}`}
-              className="inline-flex cursor-default items-center gap-2 rounded-full border border-white/5 bg-ink-900/60 px-4 py-1.5 text-xs font-medium text-ink-300 backdrop-blur transition-colors hover:border-white/20 hover:text-white"
+              className="inline-flex cursor-default items-center gap-2 rounded-full border border-white/5 bg-ink-900/90 sm:bg-ink-900/60 px-4 py-1.5 text-xs font-medium text-ink-300 backdrop-blur-none sm:backdrop-blur transition-colors hover:border-white/20 hover:text-white"
             >
               <p.icon className={`h-3.5 w-3.5 ${p.accent}`} />
               <span>{p.text}</span>

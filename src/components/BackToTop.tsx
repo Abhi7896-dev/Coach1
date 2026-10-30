@@ -5,10 +5,16 @@ export function BackToTop() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Threshold raised past the Hero's own height (not just an arbitrary
-    // 600px) — at 600px on mobile this button sat directly on top of the
-    // Hero's "Zero" stat card, hiding its label text.
-    const onScroll = () => setVisible(window.scrollY > 1400);
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setVisible(window.scrollY > 1400);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);

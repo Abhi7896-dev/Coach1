@@ -56,6 +56,9 @@ export function ForParents() {
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    // Only run scrub zoom on desktop/tablet where GPU and mouse scroll can handle it cleanly
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches) return;
+
     const ctx = gsap.context(() => {
       gsap.to('.parent-image-zoom', {
         scale: 1.15,
@@ -110,7 +113,7 @@ export function ForParents() {
                     key={b.title}
                     spotlightColor="rgba(50, 130, 251, 0.18)"
                     glowColor="rgba(50, 130, 251, 0.45)"
-                    className="group border border-white/10 bg-white/[0.05] p-5 backdrop-blur transition-all duration-300 hover:border-blue-300/40 hover:bg-white/10"
+                    className="group border border-white/10 bg-white/[0.05] p-5 backdrop-blur-none sm:backdrop-blur transition-all duration-300 hover:border-blue-300/40 hover:bg-white/10"
                   >
                     <span className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-blue-400 to-blue-600 transition-transform duration-300 group-hover:scale-x-100" />
                     <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-500/15 text-blue-300 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 group-hover:bg-blue-400 group-hover:text-blue-950">

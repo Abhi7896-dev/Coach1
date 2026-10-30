@@ -26,8 +26,7 @@ export function KineticTrajectory({ className = '' }: { className?: string }) {
           stroke="url(#trajGrad)"
           strokeWidth="2.5"
           strokeLinecap="round"
-          className="animated-stroke"
-          filter="url(#glowFilter)"
+          className="sm:animated-stroke [filter:none] sm:[filter:url(#glowFilter)]"
         />
 
         {/* Secondary ghost curve */}

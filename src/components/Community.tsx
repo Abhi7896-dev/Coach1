@@ -52,22 +52,46 @@ export function Community() {
   useEffect(() => {
     if (loading || academies.length < MIN_RESULTS_FOR_GRID) return;
     const ctx = gsap.context(() => {
-      gsap.fromTo('.academy-card',
-        { y: 120, opacity: 0, scale: 0.9 },
-        {
-          y: 0,
-          opacity: 1,
-          scale: 1,
-          stagger: 0.1,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: '.cards-container',
-            start: 'top 85%',
-            end: 'center center',
-            scrub: true,
+      let mm = gsap.matchMedia();
+
+      // On desktop, full interactive scrub
+      mm.add("(min-width: 1024px)", () => {
+        gsap.fromTo('.academy-card',
+          { y: 120, opacity: 0, scale: 0.9 },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            stagger: 0.1,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: '.cards-container',
+              start: 'top 85%',
+              end: 'center center',
+              scrub: true,
+            }
           }
-        }
-      );
+        );
+      });
+
+      // On mobile/tablet, smooth entrance once without scroll scrub lock
+      mm.add("(max-width: 1023px)", () => {
+        gsap.fromTo('.academy-card',
+          { y: 30, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            stagger: 0.08,
+            duration: 0.5,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: '.cards-container',
+              start: 'top 90%',
+              once: true,
+            }
+          }
+        );
+      });
     }, sectionRef);
     return () => ctx.revert();
   }, [loading, academies]);

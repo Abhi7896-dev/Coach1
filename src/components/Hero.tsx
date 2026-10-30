@@ -44,23 +44,6 @@ export function Hero() {
           .to('.hero-text-container', { y: 150, opacity: 0, ease: 'none' }, 0)
           .to('.hero-image-container', { y: -80, opacity: 0.2, ease: 'none' }, 0);
       });
-
-      mm.add("(max-width: 1023px)", () => {
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: containerRef.current,
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 0.5,
-          }
-        });
-
-        tl.to('.parallax-bg-1', { y: -50, ease: 'none' }, 0)
-          .to('.parallax-bg-2', { y: -100, ease: 'none' }, 0)
-          .to('.hero-text-container', { opacity: 0, ease: 'none' }, 0)
-          .to('.hero-image-container', { opacity: 0.3, ease: 'none' }, 0);
-      });
-
     }, containerRef);
 
     return () => ctx.revert();
@@ -186,7 +169,7 @@ export function Hero() {
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.5 + i * 0.08 }}
-                className={`group border bg-white/[0.04] p-4 backdrop-blur-xl transition-all duration-300 ${s.border} sm:p-5`}
+                className={`group border bg-white/[0.04] p-4 backdrop-blur-none sm:backdrop-blur-xl transition-all duration-300 ${s.border} sm:p-5`}
               >
                 <span className={`grid h-10 w-10 place-items-center rounded-xl ${s.chip} ${s.accent} transition-transform duration-300 group-hover:scale-110`}>
                   <s.icon className="h-5 w-5" />
@@ -230,16 +213,16 @@ function HeroVisual() {
         </div>
       </div>
 
-      {/* Floating sticker badges — with smooth floating motion graphics */}
-      <span className="absolute -right-3 -top-5 grid h-14 w-14 rotate-[9deg] place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-glow-orange animate-float-slow sm:-right-6">
+      {/* Floating sticker badges — with smooth floating motion graphics on desktop */}
+      <span className="absolute -right-3 -top-5 grid h-14 w-14 rotate-[9deg] place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-glow-orange sm:animate-float-slow sm:-right-6">
         <Trophy className="h-6 w-6" />
       </span>
-      <span className="absolute -right-2 bottom-1/3 grid h-11 w-11 rotate-[-10deg] place-items-center rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-glow-blue animate-float-reverse sm:-right-4">
+      <span className="absolute -right-2 bottom-1/3 grid h-11 w-11 rotate-[-10deg] place-items-center rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-glow-blue sm:animate-float-reverse sm:-right-4">
         <Timer className="h-5 w-5" />
       </span>
 
       {/* Floating: live attendance with dynamic pulse indicator */}
-      <div className="absolute -left-4 top-1/4 w-48 rounded-2xl border border-white/15 bg-ink-900/90 p-3.5 shadow-glow backdrop-blur-xl animate-float sm:-left-8 lg:-left-12">
+      <div className="absolute -left-3 top-1/4 w-44 sm:w-48 rounded-2xl border border-white/15 bg-ink-900/95 sm:bg-ink-900/90 p-3 sm:p-3.5 shadow-glow backdrop-blur-none sm:backdrop-blur-xl sm:animate-float sm:-left-8 lg:-left-12">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-300">
             Live attendance
@@ -265,7 +248,7 @@ function HeroVisual() {
       </div>
 
       {/* Floating: WhatsApp alert */}
-      <div className="absolute -right-3 bottom-10 w-52 rounded-2xl border border-white/15 bg-ink-900/90 p-3.5 shadow-glow backdrop-blur-xl animate-float-reverse sm:-right-6 lg:-right-10">
+      <div className="absolute -right-3 bottom-10 w-48 sm:w-52 rounded-2xl border border-white/15 bg-ink-900/95 sm:bg-ink-900/90 p-3 sm:p-3.5 shadow-glow backdrop-blur-none sm:backdrop-blur-xl sm:animate-float-reverse sm:-right-6 lg:-right-10">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-green-500 text-white text-sm font-bold shadow-sm">
             W
@@ -280,8 +263,8 @@ function HeroVisual() {
         </p>
       </div>
 
-      {/* Floating: progress remark */}
-      <div className="absolute -bottom-5 left-8 w-52 rounded-2xl border border-ink-100 bg-white p-3.5 shadow-glow backdrop-blur-xl animate-float-slow">
+      {/* Floating: progress remark (desktop / tablet) */}
+      <div className="absolute -bottom-5 left-8 hidden sm:block w-52 rounded-2xl border border-ink-100 bg-white p-3.5 shadow-glow backdrop-blur-xl sm:animate-float-slow">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-orange-100 text-orange-600">
             <TrendingUp className="h-4 w-4" />

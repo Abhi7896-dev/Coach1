@@ -23,17 +23,30 @@ export function BackgroundScreening({
   });
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    // Only track cursor spotlight on devices with a fine pointer (mouse / trackpad)
+    if (typeof window === 'undefined' || !window.matchMedia('(pointer: fine)').matches) return;
 
-      // Only activate spotlight when pointer is within or near the element
-      if (x >= -100 && x <= rect.width + 100 && y >= -100 && y <= rect.height + 100) {
-        setMousePos({ x, y, active: true });
-      } else {
-        setMousePos((prev) => ({ ...prev, active: false }));
+    let ticking = false;
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (!containerRef.current) {
+            ticking = false;
+            return;
+          }
+          const rect = containerRef.current.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // Only activate spotlight when pointer is within or near the element
+          if (x >= -100 && x <= rect.width + 100 && y >= -100 && y <= rect.height + 100) {
+            setMousePos({ x, y, active: true });
+          } else {
+            setMousePos((prev) => (prev.active ? { ...prev, active: false } : prev));
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
@@ -52,17 +65,17 @@ export function BackgroundScreening({
           <>
             {/* Primary Athlete Orange ambient orb */}
             <div
-              className="parallax-bg-1 absolute -left-36 -top-36 h-[620px] w-[620px] rounded-full bg-gradient-to-br from-orange-600/35 to-orange-400/20 blur-[130px] animate-pulse-glow"
+              className="parallax-bg-1 absolute -left-36 -top-36 h-[480px] w-[480px] sm:h-[620px] sm:w-[620px] rounded-full bg-gradient-to-br from-orange-600/35 to-orange-400/20 blur-[64px] sm:blur-[130px] sm:animate-pulse-glow"
               style={{ animationDuration: '7s' }}
             />
             {/* Trust Blue ambient orb */}
             <div
-              className="parallax-bg-2 absolute -right-32 top-16 h-[540px] w-[540px] rounded-full bg-gradient-to-bl from-blue-600/30 to-blue-400/15 blur-[130px] animate-pulse-glow"
+              className="parallax-bg-2 absolute -right-32 top-16 h-[420px] w-[420px] sm:h-[540px] sm:w-[540px] rounded-full bg-gradient-to-bl from-blue-600/30 to-blue-400/15 blur-[64px] sm:blur-[130px] sm:animate-pulse-glow"
               style={{ animationDuration: '9s', animationDelay: '1.5s' }}
             />
             {/* Growth Green grounding orb */}
             <div
-              className="parallax-bg-3 absolute bottom-[-100px] left-1/3 h-[460px] w-[460px] rounded-full bg-gradient-to-t from-green-500/20 to-green-400/10 blur-[120px] animate-pulse-glow"
+              className="parallax-bg-3 absolute bottom-[-100px] left-1/3 h-[380px] w-[380px] sm:h-[460px] sm:w-[460px] rounded-full bg-gradient-to-t from-green-500/20 to-green-400/10 blur-[60px] sm:blur-[120px] sm:animate-pulse-glow"
               style={{ animationDuration: '8s', animationDelay: '3s' }}
             />
           </>
@@ -71,11 +84,11 @@ export function BackgroundScreening({
         {variant === 'blue' && (
           <>
             <div
-              className="absolute -right-36 -top-24 h-[560px] w-[560px] rounded-full bg-gradient-to-br from-blue-500/30 to-blue-400/15 blur-[130px] animate-pulse-glow"
+              className="absolute -right-36 -top-24 h-[440px] w-[440px] sm:h-[560px] sm:w-[560px] rounded-full bg-gradient-to-br from-blue-500/30 to-blue-400/15 blur-[64px] sm:blur-[130px] sm:animate-pulse-glow"
               style={{ animationDuration: '8s' }}
             />
             <div
-              className="absolute -left-28 bottom-0 h-[480px] w-[480px] rounded-full bg-gradient-to-tr from-green-500/20 to-green-400/10 blur-[120px] animate-pulse-glow"
+              className="absolute -left-28 bottom-0 h-[400px] w-[400px] sm:h-[480px] sm:w-[480px] rounded-full bg-gradient-to-tr from-green-500/20 to-green-400/10 blur-[60px] sm:blur-[120px] sm:animate-pulse-glow"
               style={{ animationDuration: '9s', animationDelay: '2s' }}
             />
           </>
@@ -84,11 +97,11 @@ export function BackgroundScreening({
         {variant === 'dark' && (
           <>
             <div
-              className="absolute -left-28 -top-20 h-[480px] w-[480px] rounded-full bg-orange-600/25 blur-[120px] animate-pulse-glow"
+              className="absolute -left-28 -top-20 h-[400px] w-[400px] sm:h-[480px] sm:w-[480px] rounded-full bg-orange-600/25 blur-[60px] sm:blur-[120px] sm:animate-pulse-glow"
               style={{ animationDuration: '8s' }}
             />
             <div
-              className="absolute -right-28 -bottom-20 h-[480px] w-[480px] rounded-full bg-blue-600/25 blur-[120px] animate-pulse-glow"
+              className="absolute -right-28 -bottom-20 h-[400px] w-[400px] sm:h-[480px] sm:w-[480px] rounded-full bg-blue-600/25 blur-[60px] sm:blur-[120px] sm:animate-pulse-glow"
               style={{ animationDuration: '10s', animationDelay: '2s' }}
             />
           </>
@@ -97,17 +110,17 @@ export function BackgroundScreening({
         {variant === 'light' && (
           <>
             <div
-              className="absolute -left-40 top-1/4 h-[520px] w-[520px] rounded-full bg-orange-400/10 blur-[140px] animate-pulse-glow"
+              className="absolute -left-40 top-1/4 h-[420px] w-[420px] sm:h-[520px] sm:w-[520px] rounded-full bg-orange-400/10 blur-[64px] sm:blur-[140px] sm:animate-pulse-glow"
               style={{ animationDuration: '10s' }}
             />
             <div
-              className="absolute -right-40 bottom-1/4 h-[520px] w-[520px] rounded-full bg-blue-400/10 blur-[140px] animate-pulse-glow"
+              className="absolute -right-40 bottom-1/4 h-[420px] w-[420px] sm:h-[520px] sm:w-[520px] rounded-full bg-blue-400/10 blur-[64px] sm:blur-[140px] sm:animate-pulse-glow"
               style={{ animationDuration: '11s', animationDelay: '3s' }}
             />
           </>
         )}
 
-        {/* 2. Interactive Cursor Spotlight Screening (Follows User Movement) */}
+        {/* 2. Interactive Cursor Spotlight Screening (Follows User Movement on Desktop) */}
         {mousePos.active && (
           <div
             className="pointer-events-none absolute -inset-px transition-opacity duration-500"
@@ -142,7 +155,7 @@ export function BackgroundScreening({
               fill="none"
               stroke="url(#courtGrad)"
               strokeWidth="1.75"
-              className="animated-stroke"
+              className="sm:animated-stroke"
             />
             <path
               d="M 50,680 Q 700,200 1350,750"
@@ -162,7 +175,7 @@ export function BackgroundScreening({
               stroke="currentColor"
               strokeWidth="1"
               strokeDasharray="4 6"
-              className="text-white/60 animate-spin-slow"
+              className="text-white/60 sm:animate-spin-slow"
               style={{ transformOrigin: 'center' }}
             />
             <ellipse
@@ -178,9 +191,9 @@ export function BackgroundScreening({
           </svg>
         )}
 
-        {/* 4. Kinetic Floating Particles (Athletic Energy Points) */}
+        {/* 4. Kinetic Floating Particles (Athletic Energy Points) - hidden on mobile screens */}
         {showParticles && (
-          <div className="pointer-events-none absolute inset-0">
+          <div className="pointer-events-none absolute inset-0 hidden sm:block">
             {[
               { top: '18%', left: '12%', size: 'h-1.5 w-1.5', delay: '0s', dur: '7s', color: 'bg-orange-400' },
               { top: '28%', left: '84%', size: 'h-2 w-2', delay: '1.2s', dur: '9s', color: 'bg-blue-400' },
