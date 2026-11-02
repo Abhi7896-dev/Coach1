@@ -53,10 +53,21 @@ export function FeeTransactionsDashboard({ financeLogs, coaches }: FeeTransactio
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
   const [hoveredLine, setHoveredLine] = useState<number | null>(null);
+  const [academyFilter, setAcademyFilter] = useState<string>('all');
   const barSvgRef = useRef<SVGSVGElement | null>(null);
   const lineSvgRef = useRef<SVGSVGElement | null>(null);
 
   const coachByTutorId = useMemo(() => new Map(coaches.map((c) => [c.id, c])), [coaches]);
+
+  const academyNameOptions = useMemo(
+    () => Array.from(new Set(coaches.map((c) => c.academyName).filter(Boolean))).sort(),
+    [coaches]
+  );
+
+  const scopedLogs = useMemo(() => {
+    if (academyFilter === 'all') return financeLogs;
+    return financeLogs.filter((f) => coachByTutorId.get(f.tutor_id)?.academyName === academyFilter);
+  }, [financeLogs, coachByTutorId, academyFilter]);
 
   const { daily, cumulative, stats, methodBreakdown, recent } = useMemo(() => {
     const now = new Date();
@@ -74,7 +85,7 @@ export function FeeTransactionsDashboard({ financeLogs, coaches }: FeeTransactio
     const amountByDay = new Map<string, number>();
     days.forEach((d) => amountByDay.set(d.key, 0));
 
-    const logsWithDate = financeLogs.filter((f) => f.paid_at || f.created_at);
+    const logsWithDate = scopedLogs.filter((f) => f.paid_at || f.created_at);
 
     let collectedBeforeRange = 0;
     logsWithDate.forEach((f) => {
@@ -114,13 +125,13 @@ export function FeeTransactionsDashboard({ financeLogs, coaches }: FeeTransactio
         ? 100
         : 0;
 
-    const totalPotential = financeLogs.reduce((s, f) => s + (Number(f.amount) || 0), 0);
-    const totalPaid = financeLogs.filter((f) => isPaidStatus(f.status)).reduce((s, f) => s + (Number(f.amount) || 0), 0);
+    const totalPotential = scopedLogs.reduce((s, f) => s + (Number(f.amount) || 0), 0);
+    const totalPaid = scopedLogs.filter((f) => isPaidStatus(f.status)).reduce((s, f) => s + (Number(f.amount) || 0), 0);
 
     // Payment-method breakdown — dynamic, not hardcoded, so it reflects
     // whatever gateway strings the app actually uses (Easebuzz, Cashfree, etc).
     const methodTotals = new Map<string, { total: number; count: number }>();
-    financeLogs.forEach((f) => {
+    scopedLogs.forEach((f) => {
       if (!isPaidStatus(f.status)) return;
       const method = (f.payment_method || 'Unspecified').trim();
       const entry = methodTotals.get(method) || { total: 0, count: 0 };
@@ -146,7 +157,7 @@ export function FeeTransactionsDashboard({ financeLogs, coaches }: FeeTransactio
         : []),
     ];
 
-    const recent = [...financeLogs]
+    const recent = [...scopedLogs]
       .filter((f) => f.paid_at || f.created_at)
       .sort((a, b) => new Date(b.paid_at || b.created_at).getTime() - new Date(a.paid_at || a.created_at).getTime())
       .slice(0, 8);
@@ -164,7 +175,7 @@ export function FeeTransactionsDashboard({ financeLogs, coaches }: FeeTransactio
         growthPct,
       },
     };
-  }, [financeLogs, rangeDays]);
+  }, [scopedLogs, rangeDays]);
 
   const barMax = niceMax(Math.max(...daily.map((d) => d.amount), 1));
   const bandW = (CHART_W - PAD_LEFT - PAD_RIGHT) / daily.length;
@@ -231,22 +242,35 @@ export function FeeTransactionsDashboard({ financeLogs, coaches }: FeeTransactio
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-1">
-          {([7, 30, 90] as RangeDays[]).map((d) => (
-            <button
-              key={d}
-              onClick={() => setRangeDays(d)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                rangeDays === d ? 'bg-emerald-600 text-white shadow-md' : 'text-ink-400 hover:bg-white/[0.06]'
-              }`}
-            >
-              Last {d} days
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <select
+            value={academyFilter}
+            onChange={(e) => setAcademyFilter(e.target.value)}
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-emerald-500/60"
+          >
+            <option value="all">All Academies</option>
+            {academyNameOptions.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+            {([7, 30, 90] as RangeDays[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setRangeDays(d)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                  rangeDays === d ? 'bg-emerald-600 text-white shadow-md' : 'text-ink-400 hover:bg-white/[0.06]'
+                }`}
+              >
+                Last {d} days
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {financeLogs.length === 0 && (
+      {scopedLogs.length === 0 && (
         <div className="flex items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-300">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>No fee transactions recorded in the database yet. This dashboard will populate as real payments come through.</span>

@@ -62,6 +62,7 @@ import { CommunityEventsDashboard } from '@/components/admin/CommunityEventsDash
 import { PlatformSettingsDashboard } from '@/components/admin/PlatformSettingsDashboard';
 import { AuthRegistryDashboard } from '@/components/admin/AuthRegistryDashboard';
 import { AdminAccountDashboard } from '@/components/admin/AdminAccountDashboard';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
 export interface CoachItem {
   id: string;
@@ -98,6 +99,8 @@ export interface AcademyItem {
   coaches: CoachItem[];
 }
 
+export type RegistrationSource = 'coach' | 'parent' | 'admin' | 'unknown';
+
 export interface ParentItem {
   id: string;
   name: string;
@@ -108,6 +111,8 @@ export interface ParentItem {
   childrenCount: number;
   childrenNames: string[];
   registeredAt?: string;
+  registrationSource: RegistrationSource;
+  academyNames: string[];
 }
 
 export interface AdmissionQueryItem {
@@ -137,6 +142,7 @@ export interface SupportTicketItem {
   status: 'open' | 'in_progress' | 'resolved';
   adminNotes?: string;
   createdAt: string;
+  academyName?: string;
 }
 
 export interface PlatformConfig {
@@ -223,6 +229,8 @@ export function AdminPortal() {
   const [totalBatchesCount, setTotalBatchesCount] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [parentSourceFilter, setParentSourceFilter] = useState<'all' | RegistrationSource>('all');
+  const [academyFilter, setAcademyFilter] = useState<string>('all');
   const [coachStatusFilter, setCoachStatusFilter] = useState<'all' | 'pending' | 'approved' | 'paused' | 'rejected'>('all');
 
   // Support Desk filter/sort state
@@ -554,6 +562,40 @@ export function AdminPortal() {
         return GENERIC_NAME_PLACEHOLDERS.has(trimmed.toLowerCase()) ? null : trimmed;
       };
 
+      // Family-level origin: prefer 'parent' if any linked child was
+      // self-registered via the app, then 'admin', then 'coach' — a family
+      // with at least one self-registered child is the case admins most
+      // want surfaced as "self-registered".
+      const resolveRegistrationSource = (students: any[]): RegistrationSource => {
+        const sources = new Set(students.map((s) => s.registration_source).filter(Boolean));
+        if (sources.has('parent')) return 'parent';
+        if (sources.has('admin')) return 'admin';
+        if (sources.has('coach')) return 'coach';
+        return 'unknown';
+      };
+
+      // Which academy(ies) each student is enrolled in, resolved via
+      // enrollments.tutor_id -> coachMap's already-resolved academyName.
+      const academyNamesByStudent = new Map<string, Set<string>>();
+      if (enrollmentsData) {
+        enrollmentsData.forEach((e: any) => {
+          const sId = e.student_id;
+          const academyName = e.tutor_id ? coachMap.get(e.tutor_id)?.academyName : undefined;
+          if (sId && academyName) {
+            const set = academyNamesByStudent.get(sId) || new Set<string>();
+            set.add(academyName);
+            academyNamesByStudent.set(sId, set);
+          }
+        });
+      }
+      const resolveAcademyNames = (students: any[]): string[] => {
+        const names = new Set<string>();
+        students.forEach((s) => {
+          (academyNamesByStudent.get(s.id) || []).forEach((n) => names.add(n));
+        });
+        return Array.from(names);
+      };
+
       const parentItemsMap = new Map<string, ParentItem>();
 
       // Group students by normalized 10-digit parent phone
@@ -599,6 +641,8 @@ export function AdminPortal() {
                 childrenCount: matchedStudents.length,
                 childrenNames,
                 registeredAt: p.created_at,
+                registrationSource: resolveRegistrationSource(matchedStudents),
+                academyNames: resolveAcademyNames(matchedStudents),
               });
             }
           }
@@ -621,6 +665,8 @@ export function AdminPortal() {
             childrenCount: matchedStudents.length,
             childrenNames,
             registeredAt: first.created_at,
+            registrationSource: resolveRegistrationSource(matchedStudents),
+            academyNames: resolveAcademyNames(matchedStudents),
           });
         }
       });
@@ -676,6 +722,7 @@ export function AdminPortal() {
             status: t.status || 'open',
             adminNotes: t.admin_notes,
             createdAt: t.created_at,
+            academyName: t.user_id ? coachMap.get(t.user_id)?.academyName : undefined,
           }))
         );
       }
@@ -882,6 +929,10 @@ export function AdminPortal() {
     const pendingCoaches = coaches.filter((c) => c.status === 'pending').length;
     const pausedCoaches = coaches.filter((c) => c.status === 'paused').length;
     const openTickets = tickets.filter((t) => t.status === 'open').length;
+    const newAdmissions = admissions.filter((a) => a.status === 'new').length;
+    const selfRegisteredParents = parents.filter((p) => p.registrationSource === 'parent').length;
+    const pendingFinance = financeLogs.filter((f) => f.status === 'pending' || f.payment_status === 'pending').length;
+    const upcomingEvents = communityEvents.filter((e) => e.event_date && new Date(e.event_date) >= new Date()).length;
 
     return {
       totalCoaches,
@@ -892,12 +943,22 @@ export function AdminPortal() {
       totalStudents: totalStudentsCount || parents.reduce((a, b) => a + b.childrenCount, 0),
       totalBatches: totalBatchesCount,
       openTickets,
+      newAdmissions,
+      selfRegisteredParents,
+      pendingFinance,
+      upcomingEvents,
     };
-  }, [coaches, academies, totalStudentsCount, totalBatchesCount, parents, tickets]);
+  }, [coaches, academies, totalStudentsCount, totalBatchesCount, parents, tickets, admissions, financeLogs, communityEvents]);
+
+  const academyNameOptions = useMemo(
+    () => Array.from(new Set(academies.map((a) => a.name).filter(Boolean))).sort(),
+    [academies]
+  );
 
   const filteredCoaches = useMemo(() => {
     return coaches.filter((c) => {
       const matchFilter = coachStatusFilter === 'all' || c.status === coachStatusFilter;
+      const matchAcademy = academyFilter === 'all' || c.academyName === academyFilter;
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -906,9 +967,9 @@ export function AdminPortal() {
         c.locality.toLowerCase().includes(q) ||
         c.phone.includes(q) ||
         c.sportsOffered.some((s) => s.toLowerCase().includes(q));
-      return matchFilter && matchSearch;
+      return matchFilter && matchAcademy && matchSearch;
     });
-  }, [coaches, coachStatusFilter, searchQuery]);
+  }, [coaches, coachStatusFilter, academyFilter, searchQuery]);
 
   const filteredAcademies = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -924,18 +985,29 @@ export function AdminPortal() {
 
   const filteredParents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return parents;
-    return parents.filter(
-      (p) =>
+    return parents.filter((p) => {
+      if (parentSourceFilter !== 'all' && p.registrationSource !== parentSourceFilter) return false;
+      if (academyFilter !== 'all' && !p.academyNames.includes(academyFilter)) return false;
+      if (!q) return true;
+      return (
         p.name.toLowerCase().includes(q) ||
         p.phone.includes(q) ||
         p.childrenNames.some((c) => c.toLowerCase().includes(q))
-    );
-  }, [parents, searchQuery]);
+      );
+    });
+  }, [parents, searchQuery, parentSourceFilter, academyFilter]);
+
+  const filteredAdmissions = useMemo(() => {
+    if (academyFilter === 'all') return admissions;
+    return admissions.filter((a) => a.academyName === academyFilter);
+  }, [admissions, academyFilter]);
 
   const filteredSortedTickets = useMemo(() => {
-    const filtered =
-      ticketRoleFilter === 'all' ? tickets : tickets.filter((t) => t.role === ticketRoleFilter);
+    const filtered = tickets.filter((t) => {
+      const matchesRole = ticketRoleFilter === 'all' || t.role === ticketRoleFilter;
+      const matchesAcademy = academyFilter === 'all' || t.academyName === academyFilter;
+      return matchesRole && matchesAcademy;
+    });
 
     const sorted = [...filtered].sort((a, b) => {
       let cmp = 0;
@@ -948,7 +1020,7 @@ export function AdminPortal() {
     });
 
     return sorted;
-  }, [tickets, ticketRoleFilter, ticketSortBy, ticketSortDir]);
+  }, [tickets, ticketRoleFilter, ticketSortBy, ticketSortDir, academyFilter]);
 
   return (
     <div className="min-h-screen bg-[#090c13] font-sans text-white selection:bg-orange-500/30">
@@ -973,164 +1045,38 @@ export function AdminPortal() {
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#090c13]/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-8">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="TruCoach Logo" className="h-9 w-auto object-contain" />
-              <div className="flex flex-col">
-                <span className="font-display text-lg font-bold leading-none tracking-tight">
-                  <span className="text-blue-500">Tru</span>
-                  <span className="text-orange-500">Coach</span>
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-ink-400">
-                  Admin Console
-                </span>
-              </div>
-            </Link>
-
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-[11px] font-bold text-orange-400">
-              <Sparkles className="h-3 w-3" />
-              Live DB
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                fetchPlatformData().then((edgeSucceeded) => {
-                  if (!edgeSucceeded) fetchQuickAccessStats();
-                });
-              }}
-              disabled={isRefreshing}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-ink-200 transition-all hover:bg-white/[0.08] hover:text-white"
-            >
-              <RefreshCw className={'h-3.5 w-3.5 ' + (isRefreshing ? 'animate-spin text-orange-400' : '')} />
-              <span className="hidden sm:inline">Sync Data</span>
-            </button>
-
-            <div className="hidden md:flex items-center gap-2.5 rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] px-3.5 py-1.5 shadow-inner backdrop-blur">
-              <div className={'grid h-8 w-8 place-items-center rounded-xl font-display text-xs font-bold text-white shadow-md ' + (adminUser?.isSuperAdmin ? 'bg-gradient-to-br from-amber-400 via-orange-500 to-rose-600 ring-2 ring-amber-400/40' : 'bg-gradient-to-br from-blue-500 to-indigo-600')}>
-                {adminUser?.fullName?.charAt(0) || 'A'}
-              </div>
-              <div className="text-left">
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-bold leading-none text-white">{adminUser?.fullName}</p>
-                  {adminUser?.isSuperAdmin && (
-                    <span className="inline-flex items-center rounded-full bg-gradient-to-r from-amber-500/25 to-orange-500/25 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300 border border-amber-500/40 shadow-sm">
-                      👑 Super Admin
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] text-ink-400">{adminUser?.email || adminUser?.phone}</p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setIsConfirmingLogout(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-all hover:bg-rose-500/20 hover:text-white"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Top Tab Bar — grouped into logical clusters with an elite glass pill dock styling */}
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-8">
-          <nav className="scrollbar-none flex items-center gap-1.5 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {[
-              {
-                label: 'Overview',
-                tabs: [
-                  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-                  { id: 'coaches', label: 'Coaches (' + coaches.length + ')', icon: GraduationCap, badge: kpis.pendingCoaches },
-                  { id: 'academies', label: 'Academies (' + academies.length + ')', icon: Building2, count: academies.length },
-                  { id: 'parents', label: 'Parents & Athletes (' + parents.length + ')', icon: Users, count: parents.length },
-                  { id: 'growth', label: 'New Registrations', icon: TrendingUp },
-                  { id: 'finance', label: 'Fee Transactions', icon: Wallet },
-                  { id: 'activity', label: 'Active & Passive Users', icon: Activity },
-                ],
-              },
-              {
-                label: 'Messaging',
-                tabs: [
-                  { id: 'whatsapp', label: 'WhatsApp Templates', icon: MessageCircle },
-                  { id: 'pushtemplates', label: 'Push Templates', icon: Bell },
-                  { id: 'whatsappinbox', label: 'WhatsApp Inbox', icon: MessageCircle },
-                  { id: 'messagelogs', label: 'Message Logs', icon: Send },
-                  { id: 'paymentnotifications', label: 'Payment Notifications', icon: Receipt },
-                  { id: 'bulkimport', label: 'Bulk Import Students', icon: UploadCloud },
-                ],
-              },
-              {
-                label: 'Operations',
-                tabs: [
-                  { id: 'admissions', label: 'Admissions & Trials (' + admissions.length + ')', icon: MessageSquare, count: admissions.length },
-                  { id: 'tickets', label: 'Support Desk (' + tickets.length + ')', icon: HelpCircle, badge: kpis.openTickets },
-                  { id: 'events', label: 'Community Events (' + communityEvents.length + ')', icon: CalendarDays, count: communityEvents.length },
-                  { id: 'deletionrequests', label: 'Account Deletion Requests', icon: UserX },
-                ],
-              },
-              {
-                label: 'Platform',
-                tabs: [
-                  { id: 'settings', label: 'Platform Settings', icon: Settings },
-                  { id: 'authregistry', label: 'Auth Registry', icon: ShieldAlert },
-                ],
-              },
-            ].map((group, gi) => (
-              <React.Fragment key={group.label}>
-                {gi > 0 && <span className="mx-1.5 h-6 w-px shrink-0 bg-white/[0.08]" />}
-                {group.tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        setActiveTab(tab.id as any);
-                        setSearchQuery('');
-                      }}
-                      className={
-                        'group relative flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold whitespace-nowrap transition-all duration-200 ' +
-                        (isActive
-                          ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25 ring-1 ring-white/20 -translate-y-0.5'
-                          : 'border border-white/5 bg-white/[0.03] text-ink-300 hover:border-white/10 hover:bg-white/[0.07] hover:text-white')
-                      }
-                    >
-                      <tab.icon className={'h-3.5 w-3.5 transition-transform duration-200 ' + (isActive ? '' : 'group-hover:scale-110')} />
-                      <span>{tab.label}</span>
-                      {tab.badge ? (
-                        <span
-                          className={
-                            'rounded-full px-1.5 py-0.5 text-[10px] font-bold ' +
-                            (isActive ? 'bg-white/25 text-white' : 'bg-orange-500 text-white')
-                          }
-                        >
-                          {tab.badge}
-                        </span>
-                      ) : tab.count !== undefined && tab.count > 0 ? (
-                        <span
-                          className={
-                            'rounded-full px-1.5 py-0.5 text-[10px] font-medium ' +
-                            (isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300')
-                          }
-                        >
-                          {tab.count}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-          </nav>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#090c13] to-transparent sm:left-8" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#090c13] to-transparent sm:right-8" />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
+      <AdminSidebar
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setSearchQuery('');
+        }}
+        coachesCount={coaches.length}
+        pendingCoachesCount={kpis.pendingCoaches}
+        academiesCount={academies.length}
+        parentsCount={parents.length}
+        selfRegisteredParentsCount={kpis.selfRegisteredParents}
+        admissionsCount={admissions.length}
+        newAdmissionsCount={kpis.newAdmissions}
+        ticketsCount={tickets.length}
+        openTicketsCount={kpis.openTickets}
+        communityEventsCount={communityEvents.length}
+        upcomingEventsCount={kpis.upcomingEvents}
+        deletionRequestsCount={deletionRequestsCount || 0}
+        messagesSent7dCount={messagesSent7dCount || 0}
+        whatsappTemplateCount={whatsappTemplateCount || 0}
+        pendingFinanceCount={kpis.pendingFinance}
+        adminUser={adminUser}
+        isRefreshing={isRefreshing}
+        onRefresh={() => {
+          fetchPlatformData().then((edgeSucceeded) => {
+            if (!edgeSucceeded) fetchQuickAccessStats();
+          });
+        }}
+        onSignOutClick={() => setIsConfirmingLogout(true)}
+        onResetSearch={() => setSearchQuery('')}
+      >
+        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
@@ -1637,15 +1583,28 @@ export function AdminPortal() {
                 ))}
               </div>
 
-              <div className="relative min-w-[260px]">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <input
-                  type="text"
-                  placeholder="Search coach, academy, sport, phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-orange-500/60"
-                />
+              <div className="flex items-center gap-2">
+                <select
+                  value={academyFilter}
+                  onChange={(e) => setAcademyFilter(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-orange-500/60"
+                >
+                  <option value="all">All Academies</option>
+                  {academyNameOptions.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+
+                <div className="relative min-w-[260px]">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                  <input
+                    type="text"
+                    placeholder="Search coach, academy, sport, phone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-orange-500/60"
+                  />
+                </div>
               </div>
             </div>
 
@@ -2034,15 +1993,50 @@ export function AdminPortal() {
               </div>
             </div>
 
-            <div className="relative min-w-[280px]">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input
-                type="text"
-                placeholder="Search guardian, athlete, phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-blue-500/60"
-              />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative min-w-[280px]">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                <input
+                  type="text"
+                  placeholder="Search guardian, athlete, phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-blue-500/60"
+                />
+              </div>
+
+              <select
+                value={academyFilter}
+                onChange={(e) => setAcademyFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500/60"
+              >
+                <option value="all">All Academies</option>
+                {academyNameOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {([
+                  { id: 'all', label: `All (${parents.length})` },
+                  { id: 'parent', label: `Self-Registered (${parents.filter((p) => p.registrationSource === 'parent').length})` },
+                  { id: 'coach', label: `Added by Coach (${parents.filter((p) => p.registrationSource === 'coach').length})` },
+                  { id: 'admin', label: `Added by Admin (${parents.filter((p) => p.registrationSource === 'admin').length})` },
+                  { id: 'unknown', label: `Legacy/Unknown (${parents.filter((p) => p.registrationSource === 'unknown').length})` },
+                ] as const).map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setParentSourceFilter(f.id)}
+                    className={`rounded-xl px-3 py-1.5 text-[11px] font-bold transition whitespace-nowrap ${
+                      parentSourceFilter === f.id
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                        : 'border border-white/10 bg-white/[0.04] text-ink-300 hover:bg-white/[0.08] hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {filteredParents.length === 0 ? (
@@ -2056,6 +2050,12 @@ export function AdminPortal() {
                 {filteredParents.map((parent) => {
                   const cleanPhone = (parent.phone || '').replace(/\D/g, '');
                   const waUrl = cleanPhone ? 'https://wa.me/91' + cleanPhone : null;
+                  const sourceBadge = {
+                    parent: { label: 'Self-Registered', cls: 'border-blue-500/30 bg-blue-500/15 text-blue-300' },
+                    coach: { label: 'Added by Coach', cls: 'border-orange-500/30 bg-orange-500/15 text-orange-300' },
+                    admin: { label: 'Added by Admin', cls: 'border-purple-500/30 bg-purple-500/15 text-purple-300' },
+                    unknown: { label: 'Legacy Record', cls: 'border-white/10 bg-white/[0.06] text-ink-400' },
+                  }[parent.registrationSource];
 
                   return (
                     <div
@@ -2087,6 +2087,10 @@ export function AdminPortal() {
                             {parent.childrenCount} {parent.childrenCount === 1 ? 'Child' : 'Children'}
                           </span>
                         </div>
+
+                        <span className={`mt-3 inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${sourceBadge.cls}`}>
+                          {sourceBadge.label}
+                        </span>
 
                         {/* Athletes Roster Chips */}
                         <div className="mt-4 border-t border-white/5 pt-3.5">
@@ -2188,19 +2192,32 @@ export function AdminPortal() {
         {/* TAB 5: ADMISSIONS & TRIALS */}
         {activeTab === 'admissions' && (
           <div className="space-y-6">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">
-                Academy Inquiries &amp; Free Trials ({admissions.length})
-              </h2>
-              <p className="mt-1 text-sm text-ink-400">
-                Prospect requests submitted from the mobile app and website portal.
-              </p>
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">
+                  Academy Inquiries &amp; Free Trials ({filteredAdmissions.length})
+                </h2>
+                <p className="mt-1 text-sm text-ink-400">
+                  Prospect requests submitted from the mobile app and website portal.
+                </p>
+              </div>
+
+              <select
+                value={academyFilter}
+                onChange={(e) => setAcademyFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-purple-500/60"
+              >
+                <option value="all">All Academies</option>
+                {academyNameOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
 
-            {admissions.length === 0 ? (
+            {filteredAdmissions.length === 0 ? (
               <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-16 text-center">
                 <MessageSquare className="mx-auto h-12 w-12 text-ink-500" />
-                <p className="mt-4 text-sm font-bold text-white">No trial inquiries yet in database</p>
+                <p className="mt-4 text-sm font-bold text-white">No trial inquiries match this filter</p>
                 <p className="mt-1 text-xs text-ink-400">When visitors book trials through the app or website, they will appear here.</p>
               </div>
             ) : (
@@ -2217,7 +2234,7 @@ export function AdminPortal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {admissions.map((q) => (
+                    {filteredAdmissions.map((q) => (
                       <tr key={q.id} className="hover:bg-white/[0.03]">
                         <td className="px-6 py-4">
                           <p className="font-bold text-white">{q.parentName}</p>
@@ -2360,6 +2377,17 @@ export function AdminPortal() {
               </div>
 
               <div className="flex items-center gap-2">
+                <select
+                  value={academyFilter}
+                  onChange={(e) => setAcademyFilter(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-orange-500/60"
+                >
+                  <option value="all">All Academies</option>
+                  {academyNameOptions.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+
                 <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-1">
                   {[
                     { id: 'date', label: 'Date' },
@@ -2620,7 +2648,8 @@ export function AdminPortal() {
         )}
 
         {activeTab === 'authregistry' && <AuthRegistryDashboard />}
-      </main>
+        </main>
+      </AdminSidebar>
 
       {/* Modal: Enroll New Student */}
       <AnimatePresence>
@@ -2727,6 +2756,7 @@ export function AdminPortal() {
             onBatchCreated={fetchPlatformData}
             onUpdateEasebuzz={handleUpdateCoachEasebuzz}
             onUpdateRole={handleUpdateCoachRole}
+            onCoachUpdated={fetchPlatformData}
           />
         )}
       </AnimatePresence>
@@ -2739,6 +2769,7 @@ export function AdminPortal() {
             isOpen={!!selectedParent}
             onClose={() => setSelectedParent(null)}
             onStudentAdded={fetchPlatformData}
+            onParentDeleted={fetchPlatformData}
           />
         )}
       </AnimatePresence>

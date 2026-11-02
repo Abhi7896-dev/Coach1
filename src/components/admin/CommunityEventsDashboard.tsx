@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CalendarDays, MapPin, Globe, Lock, Trash2, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { CommunityEventItem } from '@/pages/AdminPortal';
@@ -10,12 +10,19 @@ interface CommunityEventsDashboardProps {
 
 export function CommunityEventsDashboard({ events, onEventDeleted }: CommunityEventsDashboardProps) {
   const [filter, setFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [academyFilter, setAcademyFilter] = useState<string>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const academyNameOptions = useMemo(
+    () => Array.from(new Set(events.map((e) => e.academy_name).filter(Boolean))).sort(),
+    [events]
+  );
+
   const filtered = events.filter((e) => {
-    if (filter === 'public') return e.is_public;
-    if (filter === 'private') return !e.is_public;
+    if (filter === 'public' && !e.is_public) return false;
+    if (filter === 'private' && e.is_public) return false;
+    if (academyFilter !== 'all' && e.academy_name !== academyFilter) return false;
     return true;
   });
 
@@ -49,18 +56,31 @@ export function CommunityEventsDashboard({ events, onEventDeleted }: CommunityEv
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {(['all', 'public', 'private'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-xl px-3.5 py-2 text-xs font-bold capitalize transition-all ${
-              filter === f ? 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40' : 'bg-white/5 text-ink-400 border border-white/10 hover:bg-white/10'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {(['all', 'public', 'private'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-xl px-3.5 py-2 text-xs font-bold capitalize transition-all ${
+                filter === f ? 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40' : 'bg-white/5 text-ink-400 border border-white/10 hover:bg-white/10'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={academyFilter}
+          onChange={(e) => setAcademyFilter(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-fuchsia-500/60"
+        >
+          <option value="all">All Academies</option>
+          {academyNameOptions.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
       </div>
 
       {errorMsg && (

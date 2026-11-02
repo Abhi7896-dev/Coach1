@@ -34,6 +34,7 @@ import {
   Loader2,
   Copy,
   Check,
+  Pencil,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { CoachItem } from '@/pages/AdminPortal';
@@ -109,6 +110,7 @@ interface CoachProfileModalProps {
   onBatchCreated?: () => void;
   onUpdateEasebuzz?: (coachId: string, accountLabel: string, subMerchantId: string) => Promise<void>;
   onUpdateRole?: (coachId: string, role: string) => Promise<void>;
+  onCoachUpdated?: () => void;
 }
 
 export function CoachProfileModal({
@@ -119,6 +121,7 @@ export function CoachProfileModal({
   onBatchCreated,
   onUpdateEasebuzz,
   onUpdateRole,
+  onCoachUpdated,
 }: CoachProfileModalProps) {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'batches' | 'students' | 'inquiries' | 'events' | 'finance'
@@ -156,21 +159,60 @@ export function CoachProfileModal({
     }
   };
 
+  // Community-only mode — same admin-only pattern as public profile above.
+  // A community-only coach's app hides attendance/students/finance/batches/
+  // message logs; they only get the admission-request inbox and settings.
+  const [communityOnly, setCommunityOnly] = useState<boolean | null>(null);
+  const [togglingCommunityOnly, setTogglingCommunityOnly] = useState(false);
+  const [communityOnlyError, setCommunityOnlyError] = useState<string | null>(null);
+
+  const [coachAdminNote, setCoachAdminNote] = useState('');
+
+  // Blocks new free-trial bookings with this coach; admission requests
+  // are unaffected. Same admin-only pattern as the toggles above.
+  const [blockFreeTrials, setBlockFreeTrials] = useState<boolean | null>(null);
+  const [togglingBlockFreeTrials, setTogglingBlockFreeTrials] = useState(false);
+  const [blockFreeTrialsError, setBlockFreeTrialsError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!coach) return;
     let cancelled = false;
     supabase
       .from('tutors')
-      .select('public_profile_enabled')
+      .select('public_profile_enabled, community_only, admin_note, block_free_trials')
       .eq('id', coach.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelled) setPublicProfileEnabled(data?.public_profile_enabled ?? false);
+        if (!cancelled) {
+          setPublicProfileEnabled(data?.public_profile_enabled ?? false);
+          setCommunityOnly(data?.community_only ?? false);
+          setCoachAdminNote(data?.admin_note || '');
+          setBlockFreeTrials(data?.block_free_trials ?? false);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [coach?.id]);
+
+  const handleToggleBlockFreeTrials = async () => {
+    if (!coach || blockFreeTrials === null || togglingBlockFreeTrials) return;
+    const next = !blockFreeTrials;
+    setTogglingBlockFreeTrials(true);
+    setBlockFreeTrialsError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'toggle_coach_block_free_trials', user_id: coach.id, enabled: next },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setBlockFreeTrials(next);
+    } catch (err: any) {
+      setBlockFreeTrialsError(err?.message || 'Failed to update free trial block.');
+    } finally {
+      setTogglingBlockFreeTrials(false);
+    }
+  };
 
   const handleTogglePublicProfile = async () => {
     if (!coach || publicProfileEnabled === null || togglingPublicProfile) return;
@@ -188,6 +230,110 @@ export function CoachProfileModal({
       setPublicProfileError(err?.message || 'Failed to update public profile visibility.');
     } finally {
       setTogglingPublicProfile(false);
+    }
+  };
+
+  const handleToggleCommunityOnly = async () => {
+    if (!coach || communityOnly === null || togglingCommunityOnly) return;
+    const next = !communityOnly;
+    setTogglingCommunityOnly(true);
+    setCommunityOnlyError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'toggle_coach_community_only', user_id: coach.id, enabled: next },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setCommunityOnly(next);
+      // A community-only coach is useless without being visible to parents —
+      // switching this on also turns on public profile visibility if it
+      // wasn't already, so they actually start receiving trial/admission
+      // requests instead of silently sitting invisible.
+      if (next && !publicProfileEnabled) {
+        await supabase.functions.invoke('admin-operations', {
+          body: { action: 'toggle_coach_public_profile', user_id: coach.id, enabled: true },
+        });
+        setPublicProfileEnabled(true);
+      }
+    } catch (err: any) {
+      setCommunityOnlyError(err?.message || 'Failed to update community-only mode.');
+    } finally {
+      setTogglingCommunityOnly(false);
+    }
+  };
+
+  // Edit Coach Profile State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editLocality, setEditLocality] = useState('');
+  const [editPincode, setEditPincode] = useState('');
+  const [editExperienceYears, setEditExperienceYears] = useState('');
+  const [editBasePrice, setEditBasePrice] = useState('');
+  const [editSportsOffered, setEditSportsOffered] = useState('');
+  const [editAcademyName, setEditAcademyName] = useState('');
+  const [editAdminNote, setEditAdminNote] = useState('');
+
+  const openEditProfile = () => {
+    if (!coach) return;
+    setEditName(coach.name || '');
+    setEditPhone(coach.phone || '');
+    setEditEmail(coach.email || '');
+    setEditLocality(coach.locality || '');
+    setEditPincode(coach.pincode || '');
+    setEditExperienceYears(String(coach.experienceYears ?? ''));
+    setEditBasePrice(String(coach.basePrice ?? ''));
+    setEditSportsOffered((coach.sportsOffered || []).join(', '));
+    setEditAcademyName(coach.academyName || '');
+    setEditAdminNote(coachAdminNote);
+    setEditError(null);
+    setIsEditingProfile(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!coach) return;
+    setIsSavingProfile(true);
+    setEditError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: {
+          action: 'update_coach_profile',
+          coach_id: coach.id,
+          name: editName.trim(),
+          phone: editPhone.trim(),
+          email: editEmail.trim(),
+          locality: editLocality.trim(),
+          pincode: editPincode.trim(),
+          experience_years: editExperienceYears.trim() ? Number(editExperienceYears) : undefined,
+          base_price: editBasePrice.trim() ? Number(editBasePrice) : undefined,
+          sports_offered: editSportsOffered
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          academy_name: editAcademyName.trim(),
+          admin_note: editAdminNote,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setCoachAdminNote(editAdminNote.trim());
+      if (data?.warning) {
+        // Profile fields saved; the login-email change specifically failed —
+        // surface it instead of silently closing as if everything worked.
+        setEditError(data.warning);
+        if (onCoachUpdated) onCoachUpdated();
+        return;
+      }
+      setIsEditingProfile(false);
+      if (onCoachUpdated) onCoachUpdated();
+    } catch (err: any) {
+      setEditError(err?.message || 'Failed to update coach profile.');
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -785,6 +931,14 @@ export function CoachProfileModal({
 
             {/* Quick Contact & Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={openEditProfile}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-bold text-blue-400 transition hover:bg-blue-500/20"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                <span>Edit Profile</span>
+              </button>
+
               {cleanPhone && (
                 <>
                   <a
@@ -1771,6 +1925,131 @@ export function CoachProfileModal({
               </div>
             )}
           </div>
+
+          {/* Community-only mode — admin-only, no coach-side control */}
+          <div
+            className={`mt-4 overflow-hidden rounded-2xl border transition-colors ${
+              communityOnly ? 'border-purple-500/30 bg-purple-500/[0.06]' : 'border-white/10 bg-white/5'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors ${
+                    communityOnly ? 'bg-purple-500/20 text-purple-400' : 'bg-white/10 text-ink-400'
+                  }`}
+                >
+                  <Users className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-white">Community-Only Coach</p>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                        communityOnly ? 'bg-purple-500/20 text-purple-400' : 'bg-white/10 text-ink-500'
+                      }`}
+                    >
+                      {communityOnly === null ? '...' : communityOnly ? 'Restricted' : 'Full CRM'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-ink-400">
+                    Admin-only. When on, their app hides attendance, students, finance, batches &amp;
+                    message logs — they only see the request inbox (to accept free trials/admissions)
+                    and their own profile settings.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleToggleCommunityOnly}
+                disabled={communityOnly === null || togglingCommunityOnly}
+                className={`relative h-7 w-[3.25rem] shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  communityOnly ? 'bg-purple-500' : 'bg-white/15'
+                }`}
+                aria-label="Toggle community-only mode"
+              >
+                <span
+                  className={`absolute top-0.5 grid h-6 w-6 place-items-center rounded-full bg-white shadow-md transition-transform ${
+                    communityOnly ? 'translate-x-[1.65rem]' : 'translate-x-0.5'
+                  }`}
+                >
+                  {togglingCommunityOnly ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-500" />
+                  ) : communityOnly ? (
+                    <Check className="h-3.5 w-3.5 text-purple-600" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5 text-ink-400" />
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {communityOnlyError && (
+              <p className="border-t border-white/10 px-4 py-2 text-[11px] text-rose-400">{communityOnlyError}</p>
+            )}
+          </div>
+
+          {/* Block free trials — admin-only, no coach-side control */}
+          <div
+            className={`mt-4 overflow-hidden rounded-2xl border transition-colors ${
+              blockFreeTrials ? 'border-rose-500/30 bg-rose-500/[0.06]' : 'border-white/10 bg-white/5'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors ${
+                    blockFreeTrials ? 'bg-rose-500/20 text-rose-400' : 'bg-white/10 text-ink-400'
+                  }`}
+                >
+                  <XCircle className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-white">Block Free Trials</p>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                        blockFreeTrials ? 'bg-rose-500/20 text-rose-400' : 'bg-white/10 text-ink-500'
+                      }`}
+                    >
+                      {blockFreeTrials === null ? '...' : blockFreeTrials ? 'Blocked' : 'Allowed'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-ink-400">
+                    Admin-only. Hides the Free Trial button on their profile — parents can still apply
+                    for direct Admission. Combine with the Note above to explain why.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleToggleBlockFreeTrials}
+                disabled={blockFreeTrials === null || togglingBlockFreeTrials}
+                className={`relative h-7 w-[3.25rem] shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  blockFreeTrials ? 'bg-rose-500' : 'bg-white/15'
+                }`}
+                aria-label="Toggle block free trials"
+              >
+                <span
+                  className={`absolute top-0.5 grid h-6 w-6 place-items-center rounded-full bg-white shadow-md transition-transform ${
+                    blockFreeTrials ? 'translate-x-[1.65rem]' : 'translate-x-0.5'
+                  }`}
+                >
+                  {togglingBlockFreeTrials ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-500" />
+                  ) : blockFreeTrials ? (
+                    <Check className="h-3.5 w-3.5 text-rose-600" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5 text-ink-400" />
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {blockFreeTrialsError && (
+              <p className="border-t border-white/10 px-4 py-2 text-[11px] text-rose-400">{blockFreeTrialsError}</p>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -1902,6 +2181,182 @@ export function CoachProfileModal({
                   )}
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Coach Profile */}
+      <AnimatePresence>
+        {isEditingProfile && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isSavingProfile && setIsEditingProfile(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative z-10 w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0e121a] p-7 shadow-2xl text-white"
+            >
+              <button
+                onClick={() => setIsEditingProfile(false)}
+                className="absolute right-5 top-5 p-2 text-ink-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <h3 className="font-display text-xl font-bold text-white flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-blue-400" />
+                Edit Coach Profile
+              </h3>
+              <p className="mt-1 text-xs text-ink-400">
+                Changes save directly to {coach.name}'s live record in Supabase.
+              </p>
+
+              {editError && (
+                <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-300">
+                  {editError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveProfile} className="mt-4 space-y-3 text-xs">
+                <div>
+                  <label className="text-ink-300 block mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-ink-300 block mb-1">Phone</label>
+                    <input
+                      type="text"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-ink-300 block mb-1">Academy Name</label>
+                    <input
+                      type="text"
+                      value={editAcademyName}
+                      onChange={(e) => setEditAcademyName(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-ink-300 block mb-1">
+                    Email <span className="text-ink-500">(also changes their login email)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-ink-300 block mb-1">Locality</label>
+                    <input
+                      type="text"
+                      value={editLocality}
+                      onChange={(e) => setEditLocality(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-ink-300 block mb-1">Pincode</label>
+                    <input
+                      type="text"
+                      value={editPincode}
+                      onChange={(e) => setEditPincode(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-ink-300 block mb-1">Experience (Years)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editExperienceYears}
+                      onChange={(e) => setEditExperienceYears(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-ink-300 block mb-1">Base Price (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editBasePrice}
+                      onChange={(e) => setEditBasePrice(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-ink-300 block mb-1">Sports Offered (comma-separated)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Badminton, Tennis"
+                    value={editSportsOffered}
+                    onChange={(e) => setEditSportsOffered(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-ink-300 block mb-1">
+                    Note to Parents <span className="text-ink-500">(shown live on their Explore/Community profile)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. Not accepting free trials currently — admissions only."
+                    value={editAdminNote}
+                    onChange={(e) => setEditAdminNote(e.target.value)}
+                    className="w-full resize-none rounded-xl border border-white/10 bg-white/5 p-2.5 text-white outline-none focus:border-blue-500"
+                  />
+                  <p className="mt-1 text-[10px] text-ink-500">Leave blank to show no note.</p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProfile(false)}
+                    disabled={isSavingProfile}
+                    className="rounded-xl px-3 py-1.5 text-xs text-ink-300 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingProfile}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 shadow-md disabled:opacity-60"
+                  >
+                    {isSavingProfile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                    <span>{isSavingProfile ? 'Saving...' : 'Save Changes'}</span>
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

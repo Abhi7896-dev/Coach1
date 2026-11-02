@@ -33,6 +33,7 @@ interface ParentProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStudentAdded?: () => void;
+  onParentDeleted?: () => void;
 }
 
 export function ParentProfileModal({
@@ -40,6 +41,7 @@ export function ParentProfileModal({
   isOpen,
   onClose,
   onStudentAdded,
+  onParentDeleted,
 }: ParentProfileModalProps) {
   const [activeTab, setActiveTab] = useState<'athletes' | 'trials' | 'receipts' | 'profile'>('athletes');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +49,8 @@ export function ParentProfileModal({
   const [enrollmentsList, setEnrollmentsList] = useState<any[]>([]);
   const [inquiriesList, setInquiriesList] = useState<any[]>([]);
   const [financeList, setFinanceList] = useState<any[]>([]);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeletingParent, setIsDeletingParent] = useState(false);
 
   // Add Athlete state
   const [isAddingAthlete, setIsAddingAthlete] = useState(false);
@@ -74,8 +78,30 @@ export function ParentProfileModal({
   useEffect(() => {
     if (parent && isOpen) {
       loadDeepParentData(parent.phone);
+      setIsDeleteConfirmOpen(false);
     }
   }, [parent, isOpen]);
+
+  const handleDeleteParent = async () => {
+    if (!parent) return;
+    setIsDeletingParent(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'delete_parent', parent_id: parent.id, phone: parent.phone },
+      });
+      if (error || !data?.success) {
+        alert('Could not delete parent profile: ' + (error?.message || data?.error || 'Unknown error'));
+        return;
+      }
+      onClose();
+      if (onParentDeleted) onParentDeleted();
+    } catch (err: any) {
+      alert('Error deleting parent profile: ' + err.message);
+    } finally {
+      setIsDeletingParent(false);
+      setIsDeleteConfirmOpen(false);
+    }
+  };
 
   const loadDeepParentData = async (rawPhone: string) => {
     setIsLoading(true);
@@ -163,6 +189,7 @@ export function ParentProfileModal({
           dob: ageToDob(athleteAge),
           guardian_name: parent.name,
           parent_phone: p10,
+          registration_source: 'admin',
         })
         .select()
         .single();
@@ -275,6 +302,13 @@ export function ParentProfileModal({
                   </a>
                 </>
               )}
+              <button
+                onClick={() => setIsDeleteConfirmOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/20"
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>Delete Parent Profile</span>
+              </button>
             </div>
           </div>
 
@@ -621,6 +655,57 @@ export function ParentProfileModal({
           </button>
         </div>
       </motion.div>
+
+      {/* Delete Confirmation Overlay */}
+      <AnimatePresence>
+        {isDeleteConfirmOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-20 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+            onClick={() => !isDeletingParent && setIsDeleteConfirmOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-3xl border border-red-500/30 bg-[#140c0c] p-6 text-white shadow-2xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-500/15 text-red-400">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <h3 className="font-display text-lg font-bold text-white">Delete Parent Profile?</h3>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-ink-300">
+                This permanently removes <strong className="text-white">{parent.name}</strong>'s login
+                (+91 {parent.phone}) and any pending free-trial / admission requests they submitted.
+                Their {studentsList.length} linked{' '}
+                {studentsList.length === 1 ? 'athlete record is' : 'athlete records are'} kept and stay
+                with the assigned academy/coach — only the parent's own account is deleted. This cannot be undone.
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  disabled={isDeletingParent}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-ink-300 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteParent}
+                  disabled={isDeletingParent}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-500/20 hover:bg-red-500 disabled:opacity-60"
+                >
+                  {isDeletingParent ? 'Deleting...' : 'Yes, Delete Parent'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

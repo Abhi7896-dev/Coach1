@@ -61,9 +61,9 @@ export function AboutUs() {
 
                 <div>
                   {/* Founder Profile Header */}
-                  <div className="flex items-center gap-4 sm:gap-5">
+                  <div className="flex items-center gap-4 sm:gap-6">
                     <div className="relative shrink-0">
-                      <div className="h-20 w-20 sm:h-22 sm:w-22 overflow-hidden rounded-2xl border-2 border-white shadow-md bg-ink-50">
+                      <div className="h-32 w-32 sm:h-36 sm:w-36 overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-white shadow-lg bg-ink-50 ring-2 ring-orange-500/15 transition-all duration-300 group-hover:ring-orange-500/30">
                         <img
                           src={founder.img}
                           alt={founder.name}

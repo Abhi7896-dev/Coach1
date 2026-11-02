@@ -1,10 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
 import { TrendingUp, TrendingDown, Users, UserPlus, Calendar, Phone, MapPin } from 'lucide-react';
-import { ParentItem } from '@/pages/AdminPortal';
+import { ParentItem, RegistrationSource } from '@/pages/AdminPortal';
 
 interface GrowthDashboardProps {
   parents: ParentItem[];
 }
+
+const SOURCE_BADGE: Record<RegistrationSource, { label: string; cls: string }> = {
+  parent: { label: 'Self-Registered', cls: 'border-blue-500/30 bg-blue-500/15 text-blue-300' },
+  coach: { label: 'Added by Coach', cls: 'border-orange-500/30 bg-orange-500/15 text-orange-300' },
+  admin: { label: 'Added by Admin', cls: 'border-purple-500/30 bg-purple-500/15 text-purple-300' },
+  unknown: { label: 'Legacy Record', cls: 'border-white/10 bg-white/[0.06] text-ink-400' },
+};
 
 type RangeDays = 7 | 30 | 90;
 
@@ -34,8 +41,23 @@ export function GrowthDashboard({ parents }: GrowthDashboardProps) {
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
   const [hoveredLine, setHoveredLine] = useState<number | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<'all' | RegistrationSource>('all');
+  const [academyFilter, setAcademyFilter] = useState<string>('all');
   const barSvgRef = useRef<SVGSVGElement | null>(null);
   const lineSvgRef = useRef<SVGSVGElement | null>(null);
+
+  const academyNameOptions = useMemo(
+    () => Array.from(new Set(parents.flatMap((p) => p.academyNames))).sort(),
+    [parents]
+  );
+
+  const scopedParents = useMemo(() => {
+    return parents.filter((p) => {
+      if (sourceFilter !== 'all' && p.registrationSource !== sourceFilter) return false;
+      if (academyFilter !== 'all' && !p.academyNames.includes(academyFilter)) return false;
+      return true;
+    });
+  }, [parents, sourceFilter, academyFilter]);
 
   const { daily, cumulative, stats, recent } = useMemo(() => {
     const now = new Date();
@@ -54,7 +76,7 @@ export function GrowthDashboard({ parents }: GrowthDashboardProps) {
     days.forEach((d) => countsByDay.set(d.key, 0));
 
     let totalBeforeRange = 0;
-    const validParents = parents.filter((p) => p.registeredAt);
+    const validParents = scopedParents.filter((p) => p.registeredAt);
 
     validParents.forEach((p) => {
       const d = new Date(p.registeredAt as string);
@@ -99,14 +121,14 @@ export function GrowthDashboard({ parents }: GrowthDashboardProps) {
       cumulative,
       recent,
       stats: {
-        totalParents: parents.length,
+        totalParents: scopedParents.length,
         newInRange,
         growthPct,
         avgPerDay: newInRange / rangeDays,
-        withoutDate: parents.length - validParents.length,
+        withoutDate: scopedParents.length - validParents.length,
       },
     };
-  }, [parents, rangeDays]);
+  }, [scopedParents, rangeDays]);
 
   // ---- Bar chart geometry (daily new registrations) ----
   const barMax = niceMax(Math.max(...daily.map((d) => d.count), 1));
@@ -188,6 +210,42 @@ export function GrowthDashboard({ parents }: GrowthDashboardProps) {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Academy + registration-source filters — scope every stat/chart/table below */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {([
+            { id: 'all', label: 'All' },
+            { id: 'parent', label: 'Self-Registered' },
+            { id: 'coach', label: 'Added by Coach' },
+            { id: 'admin', label: 'Added by Admin' },
+            { id: 'unknown', label: 'Legacy/Unknown' },
+          ] as const).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setSourceFilter(f.id)}
+              className={`rounded-xl px-3 py-1.5 text-[11px] font-bold transition whitespace-nowrap ${
+                sourceFilter === f.id
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'border border-white/10 bg-white/[0.04] text-ink-300 hover:bg-white/[0.08] hover:text-white'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={academyFilter}
+          onChange={(e) => setAcademyFilter(e.target.value)}
+          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500/60"
+        >
+          <option value="all">All Academies</option>
+          {academyNameOptions.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
       </div>
 
       {/* KPI stat tiles */}
@@ -443,6 +501,7 @@ export function GrowthDashboard({ parents }: GrowthDashboardProps) {
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Locality</th>
                   <th className="px-4 py-3">Children</th>
+                  <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Joined</th>
                 </tr>
               </thead>
@@ -461,6 +520,11 @@ export function GrowthDashboard({ parents }: GrowthDashboardProps) {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-ink-300">{p.childrenCount}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${SOURCE_BADGE[p.registrationSource].cls}`}>
+                        {SOURCE_BADGE[p.registrationSource].label}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-ink-400">
                       {p.registeredAt ? new Date(p.registeredAt).toLocaleDateString() : '—'}
                     </td>

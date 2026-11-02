@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.trucoach.app",
+      "sha256_cert_fingerprints": [
+        "40:17:18:8E:EA:9E:78:7A:22:F6:A4:C5:70:66:8C:38:AC:32:25:BE:FC:13:B7:80:E7:76:9D:02:A5:0F:E4:36"
+      ]
+    }
+  }
+]

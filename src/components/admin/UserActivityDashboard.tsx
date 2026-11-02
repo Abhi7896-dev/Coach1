@@ -24,6 +24,7 @@ interface ActivityRow {
 export function UserActivityDashboard({ coaches, parents }: UserActivityDashboardProps) {
   const [windowDays, setWindowDays] = useState<WindowDays>(30);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [academyFilter, setAcademyFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [setupNeeded, setSetupNeeded] = useState(false);
@@ -32,6 +33,13 @@ export function UserActivityDashboard({ coaches, parents }: UserActivityDashboar
 
   const coachById = useMemo(() => new Map(coaches.map((c) => [c.id, c])), [coaches]);
   const parentById = useMemo(() => new Map(parents.map((p) => [p.id, p])), [parents]);
+
+  const academyNameOptions = useMemo(() => {
+    const names = new Set<string>();
+    coaches.forEach((c) => c.academyName && names.add(c.academyName));
+    parents.forEach((p) => p.academyNames.forEach((n) => names.add(n)));
+    return Array.from(names).sort();
+  }, [coaches, parents]);
 
   const loadActivity = async () => {
     setIsLoading(true);
@@ -90,35 +98,45 @@ export function UserActivityDashboard({ coaches, parents }: UserActivityDashboar
         const coach = roleGroup === 'coach' ? coachById.get(r.id) : undefined;
         const parent = roleGroup === 'parent' ? parentById.get(r.id) : undefined;
 
+        const rowAcademyNames = coach?.academyName ? [coach.academyName] : parent?.academyNames || [];
+
         return {
           ...r,
           status,
           roleGroup,
           displayName: r.fullName || coach?.name || parent?.name || 'Unnamed User',
           context: coach?.academyName || parent?.locality || '',
+          academyNames: rowAcademyNames,
         };
       });
   }, [rows, windowDays, coachById, parentById]);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+  const scopedClassified = useMemo(() => {
     return classified.filter((r) => {
       const matchesRole = roleFilter === 'all' || r.roleGroup === roleFilter;
+      const matchesAcademy = academyFilter === 'all' || r.academyNames.includes(academyFilter);
+      return matchesRole && matchesAcademy;
+    });
+  }, [classified, roleFilter, academyFilter]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return scopedClassified.filter((r) => {
       const matchesSearch =
         !q ||
         r.displayName.toLowerCase().includes(q) ||
         (r.phone || '').includes(q) ||
         (r.email || '').toLowerCase().includes(q);
-      return matchesRole && matchesSearch;
+      return matchesSearch;
     });
-  }, [classified, roleFilter, search]);
+  }, [scopedClassified, search]);
 
   const stats = useMemo(() => {
-    const active = classified.filter((r) => r.status === 'active').length;
-    const passive = classified.filter((r) => r.status === 'passive').length;
-    const never = classified.filter((r) => r.status === 'never').length;
-    return { active, passive, never, total: classified.length };
-  }, [classified]);
+    const active = scopedClassified.filter((r) => r.status === 'active').length;
+    const passive = scopedClassified.filter((r) => r.status === 'passive').length;
+    const never = scopedClassified.filter((r) => r.status === 'never').length;
+    return { active, passive, never, total: scopedClassified.length };
+  }, [scopedClassified]);
 
   if (setupNeeded) {
     return (
@@ -278,15 +296,28 @@ export function UserActivityDashboard({ coaches, parents }: UserActivityDashboar
                 </button>
               ))}
             </div>
-            <div className="relative min-w-[240px]">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input
-                type="text"
-                placeholder="Search name, phone, email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-blue-500/60"
-              />
+            <div className="flex items-center gap-2">
+              <select
+                value={academyFilter}
+                onChange={(e) => setAcademyFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white outline-none focus:border-blue-500/60"
+              >
+                <option value="all">All Academies</option>
+                {academyNameOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+
+              <div className="relative min-w-[240px]">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                <input
+                  type="text"
+                  placeholder="Search name, phone, email..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-blue-500/60"
+                />
+              </div>
             </div>
           </div>
 

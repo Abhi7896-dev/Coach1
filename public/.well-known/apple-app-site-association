@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "3A6F988V9J.com.trucoach.app",
+        "paths": ["/app/*"]
+      }
+    ]
+  }
+}

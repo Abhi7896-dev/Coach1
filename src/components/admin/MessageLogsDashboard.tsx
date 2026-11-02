@@ -50,10 +50,15 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
 
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [academyFilter, setAcademyFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
   const coachById = useMemo(() => new Map(coaches.map((c) => [c.id, c])), [coaches]);
   const parentByPhone = useMemo(() => new Map(parents.map((p) => [normalizePhone(p.phone), p])), [parents]);
+  const academyNameOptions = useMemo(
+    () => Array.from(new Set(coaches.map((c) => c.academyName).filter(Boolean))).sort(),
+    [coaches]
+  );
 
   const loadLogs = async (days: RangeDays) => {
     setIsLoading(true);
@@ -100,14 +105,27 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
     const coach = log.tutor_id ? coachById.get(log.tutor_id) : undefined;
     const parent = log.recipient_phone ? parentByPhone.get(normalizePhone(log.recipient_phone)) : undefined;
 
-    const name = parent?.name || coach?.name || student?.guardian_name || 'Unknown Recipient';
-    const context = student ? `Re: ${student.name}` : coach ? coach.academyName : parent ? 'Parent' : '';
-    return { name, context };
+    // A coach message has no parent/student at all — keep it as the
+    // original single name. Otherwise surface both the parent AND the
+    // student explicitly, instead of only ever showing whichever one
+    // happened to resolve (e.g. "Re: <student>" disappearing whenever the
+    // log's recipient_phone didn't match a known parent record).
+    const parentName = parent?.name || student?.guardian_name;
+    const studentName = student?.name;
+
+    const name = parentName || coach?.name || 'Unknown Recipient';
+    const context = coach && !parentName ? coach.academyName : '';
+    return { name, context, parentName, studentName, isCoach: !!coach && !parentName && !studentName };
   };
+
+  const scopedLogs = useMemo(() => {
+    if (academyFilter === 'all') return logs;
+    return logs.filter((l) => l.tutor_id && coachById.get(l.tutor_id)?.academyName === academyFilter);
+  }, [logs, coachById, academyFilter]);
 
   const typeBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
-    logs.forEach((l) => {
+    scopedLogs.forEach((l) => {
       const t = (l.message_type || 'Unspecified').trim();
       counts.set(t, (counts.get(t) || 0) + 1);
     });
@@ -120,38 +138,42 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
       ...top,
       ...(rest.length > 0 ? [{ type: 'Other', count: rest.reduce((s, r) => s + r.count, 0) }] : []),
     ];
-  }, [logs]);
+  }, [scopedLogs]);
 
   const statusBreakdown = useMemo(() => {
     const buckets = { good: 0, warning: 0, critical: 0 };
-    logs.forEach((l) => {
+    scopedLogs.forEach((l) => {
       buckets[statusBucket(l.status)]++;
     });
     return buckets;
-  }, [logs]);
+  }, [scopedLogs]);
 
   const messageTypes = useMemo(
-    () => Array.from(new Set(logs.map((l) => l.message_type || 'Unspecified'))),
-    [logs]
+    () => Array.from(new Set(scopedLogs.map((l) => l.message_type || 'Unspecified'))),
+    [scopedLogs]
   );
-  const statuses = useMemo(() => Array.from(new Set(logs.map((l) => l.status || 'unknown'))), [logs]);
+  const statuses = useMemo(() => Array.from(new Set(scopedLogs.map((l) => l.status || 'unknown'))), [scopedLogs]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return logs.filter((l) => {
+    return scopedLogs.filter((l) => {
       const matchesType = typeFilter === 'all' || (l.message_type || 'Unspecified') === typeFilter;
       const matchesStatus = statusFilter === 'all' || (l.status || 'unknown') === statusFilter;
       if (!matchesType || !matchesStatus) return false;
       if (!q) return true;
-      const { name } = resolveRecipient(l);
-      return name.toLowerCase().includes(q) || (l.recipient_phone || '').includes(q);
+      const { name, studentName } = resolveRecipient(l);
+      return (
+        name.toLowerCase().includes(q) ||
+        (studentName || '').toLowerCase().includes(q) ||
+        (l.recipient_phone || '').includes(q)
+      );
       // eslint-disable-next-line react-hooks/exhaustive-deps
     });
-  }, [logs, typeFilter, statusFilter, search, studentMap, coachById, parentByPhone]);
+  }, [scopedLogs, typeFilter, statusFilter, search, studentMap, coachById, parentByPhone]);
 
   const uniqueRecipients = useMemo(
-    () => new Set(logs.map((l) => normalizePhone(l.recipient_phone)).filter(Boolean)).size,
-    [logs]
+    () => new Set(scopedLogs.map((l) => normalizePhone(l.recipient_phone)).filter(Boolean)).size,
+    [scopedLogs]
   );
 
   const typeMax = Math.max(...typeBreakdown.map((t) => t.count), 1);
@@ -205,6 +227,63 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
             </div>
           )}
 
+          {/* Filters — always visible, even when the current filter combo matches zero
+              messages, so you're never stuck unable to switch back to another coach/academy. */}
+          <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-[#141a26] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+              >
+                <option value="all">All Types ({scopedLogs.length})</option>
+                {messageTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-[#141a26] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+              >
+                <option value="all">All Statuses</option>
+                {statuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={academyFilter}
+                onChange={(e) => setAcademyFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-[#141a26] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+              >
+                <option value="all">All Academies</option>
+                {academyNameOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="relative min-w-[240px]">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+              <input
+                type="text"
+                placeholder="Search parent, student, phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-blue-500/60"
+              />
+            </div>
+          </div>
+
+          {scopedLogs.length === 0 ? (
+            <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-16 text-center text-xs text-ink-400">
+              No messages match the selected academy/coach for this period. Switch the filter above to see other records.
+            </div>
+          ) : (
+            <>
           {/* KPI tiles */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
@@ -214,7 +293,7 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
                   <Send className="h-5 w-5" />
                 </span>
               </div>
-              <div className="mt-4 font-display text-3xl font-bold text-white">{logs.length}</div>
+              <div className="mt-4 font-display text-3xl font-bold text-white">{scopedLogs.length}</div>
               <p className="mt-2 text-xs text-ink-400">Last {rangeDays} days</p>
             </div>
 
@@ -281,46 +360,6 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#141a26] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-              >
-                <option value="all">All Types ({logs.length})</option>
-                {messageTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#141a26] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-              >
-                <option value="all">All Statuses</option>
-                {statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="relative min-w-[240px]">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input
-                type="text"
-                placeholder="Search recipient, phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2 pl-10 pr-4 text-xs text-white placeholder-ink-400 outline-none focus:border-blue-500/60"
-              />
-            </div>
-          </div>
-
           {/* Table */}
           {filtered.length === 0 ? (
             <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-16 text-center text-xs text-ink-400">
@@ -331,7 +370,7 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-white/10 bg-white/[0.02] uppercase text-ink-400">
                   <tr>
-                    <th className="px-5 py-3.5">Recipient</th>
+                    <th className="px-5 py-3.5">Parent / Student</th>
                     <th className="px-5 py-3.5">Phone</th>
                     <th className="px-5 py-3.5">Message Type</th>
                     <th className="px-5 py-3.5">Status</th>
@@ -340,13 +379,26 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {filtered.slice(0, 300).map((log) => {
-                    const { name, context } = resolveRecipient(log);
+                    const { name, context, parentName, studentName, isCoach } = resolveRecipient(log);
                     const bucket = statusBucket(log.status);
                     return (
                       <tr key={log.id} className="hover:bg-white/[0.03]">
                         <td className="px-5 py-3.5">
-                          <p className="font-bold text-white">{name}</p>
-                          {context && <p className="text-ink-400">{context}</p>}
+                          {isCoach ? (
+                            <>
+                              <p className="font-bold text-white">{name}</p>
+                              {context && <p className="text-ink-400">{context}</p>}
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-bold text-white">
+                                {parentName || 'Unknown Parent'}
+                              </p>
+                              <p className="text-ink-400">
+                                {studentName ? `Student: ${studentName}` : 'No linked student'}
+                              </p>
+                            </>
+                          )}
                         </td>
                         <td className="px-5 py-3.5 font-mono text-ink-300">{log.recipient_phone || '—'}</td>
                         <td className="px-5 py-3.5 text-ink-200">{log.message_type || 'Unspecified'}</td>
@@ -378,6 +430,8 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
                 </p>
               )}
             </div>
+          )}
+            </>
           )}
         </>
       )}

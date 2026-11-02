@@ -207,7 +207,7 @@ export function AiChatBot() {
       q.includes('directory')
     ) {
       return {
-        text: "We are mapping every local academy so no talent goes unnoticed! You can browse and filter verified sports academies and private tutors by sport, city, or locality.",
+        text: "We are mapping every small academies so no talent goes unnoticed! You can browse and filter verified sports academies and private tutors by sport, city, or locality.",
         actions: [
           { type: 'route', label: 'Explore Academies Directory', payload: '/academies' },
           { type: 'scroll', label: 'View Community Section', payload: 'community' },
@@ -553,11 +553,10 @@ export function AiChatBot() {
                   className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-xs ${
-                      msg.sender === 'user'
+                    className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-xs ${msg.sender === 'user'
                         ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-br-xs'
                         : 'border border-ink-100 bg-white text-ink-800 rounded-bl-xs'
-                    }`}
+                      }`}
                   >
                     {msg.sender === 'user' ? (
                       <p className="whitespace-pre-line">{msg.text}</p>
