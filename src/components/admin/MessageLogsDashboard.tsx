@@ -18,6 +18,30 @@ interface LogRow {
   tutor_id: string | null;
   student_id: string | null;
   status: string | null;
+  wa_message_id: string | null;
+}
+
+// Meta's real delivery-status webhook updates a dedicated
+// automation_message_status table on the separate TruCoach-WhatsApp
+// project — completely apart from that project's Inbox conversation
+// table — so `status` above only ever means "Meta's Cloud API accepted
+// the send request", never that the recipient's phone actually received
+// or read it. This maps the real, webhook-confirmed status (fetched via
+// whatsapp-inbox-proxy's get_message_statuses action, keyed by
+// wa_message_id) to a short label.
+function confirmedStatusLabel(status: string | undefined): { label: string; bucket: 'good' | 'warning' | 'critical' } {
+  switch (status) {
+    case 'read':
+      return { label: 'Read', bucket: 'good' };
+    case 'delivered':
+      return { label: 'Delivered', bucket: 'good' };
+    case 'sent':
+      return { label: 'Sent (awaiting delivery)', bucket: 'warning' };
+    case 'failed':
+      return { label: 'Failed', bucket: 'critical' };
+    default:
+      return { label: 'Not confirmed yet', bucket: 'warning' };
+  }
 }
 
 // Same validated categorical order used for the payment-method breakdown —
@@ -47,6 +71,7 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
+  const [confirmedStatuses, setConfirmedStatuses] = useState<Map<string, string>>(new Map());
 
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -73,7 +98,7 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
       // this result — one round trip instead of two, chained.
       const { data, error, count } = await supabase
         .from('automation_logs')
-        .select('id, recipient_phone, message_type, sent_at, tutor_id, student_id, status, students(id, name, guardian_name)', { count: 'exact' })
+        .select('id, recipient_phone, message_type, sent_at, tutor_id, student_id, status, wa_message_id, students(id, name, guardian_name)', { count: 'exact' })
         .gte('sent_at', start.toISOString())
         .order('sent_at', { ascending: false })
         .limit(LIMIT);
@@ -87,7 +112,35 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
       const rows = data || [];
       setLogs(rows);
       setTruncated((count || 0) > rows.length);
-      setStudentMap(new Map(rows.filter((r: any) => r.students).map((r: any) => [r.students.id, r.students])));
+
+      // Batch-fetch the REAL, Meta-webhook-confirmed status for every log
+      // that has a wa_message_id — older rows recorded before this tracking
+      // was added simply have none and stay "Not confirmed yet". Reads a
+      // table dedicated to automated sends, never the Inbox's own table.
+      const waIds = Array.from(new Set(rows.map((r: any) => r.wa_message_id).filter(Boolean)));
+      if (waIds.length > 0) {
+        try {
+          const { data: statusData, error: statusError } = await supabase.functions.invoke('whatsapp-inbox-proxy', {
+            body: { action: 'get_message_statuses', wa_message_ids: waIds },
+          });
+          if (!statusError && statusData?.statuses) {
+            setConfirmedStatuses(new Map(Object.entries(statusData.statuses)));
+          }
+        } catch {
+          // Non-fatal — the column just shows "Not confirmed yet" for everything.
+        }
+      }
+
+      // PostgREST can return the embedded `students` relation as either a
+      // single object or a one-element array depending on how it resolves
+      // the FK's cardinality — normalize both shapes here, otherwise every
+      // row silently fails to match (keying the map off `undefined`) and
+      // falls back to showing the sending coach's name for every log.
+      const entries = rows
+        .map((r: any) => (Array.isArray(r.students) ? r.students[0] : r.students))
+        .map((s: any) => (s ? [s.id, s] : null))
+        .filter(Boolean) as [string, { id: string; name: string; guardian_name: string }][];
+      setStudentMap(new Map(entries));
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to load message logs.');
     } finally {
@@ -373,7 +426,8 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
                     <th className="px-5 py-3.5">Parent / Student</th>
                     <th className="px-5 py-3.5">Phone</th>
                     <th className="px-5 py-3.5">Message Type</th>
-                    <th className="px-5 py-3.5">Status</th>
+                    <th className="px-5 py-3.5">Sent</th>
+                    <th className="px-5 py-3.5">Received (Meta confirmed)</th>
                     <th className="px-5 py-3.5">Sent At</th>
                   </tr>
                 </thead>
@@ -416,8 +470,37 @@ export function MessageLogsDashboard({ coaches, parents }: MessageLogsDashboardP
                             {log.status || 'unknown'}
                           </span>
                         </td>
+                        <td className="px-5 py-3.5">
+                          {(() => {
+                            const confirmed = confirmedStatusLabel(
+                              log.wa_message_id ? confirmedStatuses.get(log.wa_message_id) : undefined
+                            );
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                                  confirmed.bucket === 'good'
+                                    ? 'bg-emerald-500/15 text-emerald-400'
+                                    : confirmed.bucket === 'warning'
+                                    ? 'bg-amber-500/15 text-amber-400'
+                                    : 'bg-rose-500/15 text-rose-400'
+                                }`}
+                              >
+                                {confirmed.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-5 py-3.5 text-ink-400">
-                          {log.sent_at ? new Date(log.sent_at).toLocaleString() : '—'}
+                          {log.sent_at
+                            ? new Date(log.sent_at).toLocaleString(undefined, {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              })
+                            : '—'}
                         </td>
                       </tr>
                     );

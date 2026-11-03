@@ -51,6 +51,8 @@ export function ParentProfileModal({
   const [financeList, setFinanceList] = useState<any[]>([]);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingParent, setIsDeletingParent] = useState(false);
+  const [studentPendingDelete, setStudentPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
 
   // Add Athlete state
   const [isAddingAthlete, setIsAddingAthlete] = useState(false);
@@ -82,6 +84,22 @@ export function ParentProfileModal({
     }
   }, [parent, isOpen]);
 
+  // supabase-js's FunctionsHttpError.message is always the generic "Edge
+  // Function returned a non-2xx status code" — the function's actual error
+  // body (e.g. a real Postgres constraint message) only lives on
+  // error.context, a raw Response that has to be read and JSON-parsed
+  // separately. Without this, every edge-function failure looks identical
+  // and un-debuggable from the UI alone.
+  const resolveFunctionError = async (error: any, fallback?: string): Promise<string> => {
+    try {
+      const body = await error?.context?.json?.();
+      if (body?.error) return body.error;
+    } catch {
+      // context wasn't JSON (or already consumed) — fall through
+    }
+    return fallback || error?.message || 'Unknown error';
+  };
+
   const handleDeleteParent = async () => {
     if (!parent) return;
     setIsDeletingParent(true);
@@ -90,7 +108,8 @@ export function ParentProfileModal({
         body: { action: 'delete_parent', parent_id: parent.id, phone: parent.phone },
       });
       if (error || !data?.success) {
-        alert('Could not delete parent profile: ' + (error?.message || data?.error || 'Unknown error'));
+        const reason = error ? await resolveFunctionError(error) : data?.error || 'Unknown error';
+        alert('Could not delete parent profile: ' + reason);
         return;
       }
       onClose();
@@ -100,6 +119,29 @@ export function ParentProfileModal({
     } finally {
       setIsDeletingParent(false);
       setIsDeleteConfirmOpen(false);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!studentPendingDelete) return;
+    setIsDeletingStudent(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'delete_student', student_id: studentPendingDelete.id },
+      });
+      if (error || !data?.success) {
+        const reason = error ? await resolveFunctionError(error) : data?.error || 'Unknown error';
+        alert('Could not delete this child: ' + reason);
+        return;
+      }
+      setStudentsList((prev) => prev.filter((s) => s.id !== studentPendingDelete.id));
+      setEnrollmentsList((prev) => prev.filter((e) => e.student_id !== studentPendingDelete.id));
+      if (onStudentAdded) onStudentAdded();
+    } catch (err: any) {
+      alert('Error deleting this child: ' + err.message);
+    } finally {
+      setIsDeletingStudent(false);
+      setStudentPendingDelete(null);
     }
   };
 
@@ -444,9 +486,17 @@ export function ParentProfileModal({
                               </div>
                             </div>
 
-                            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400 self-start sm:self-auto">
-                              Active Athlete
-                            </span>
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400">
+                                Active Athlete
+                              </span>
+                              <button
+                                onClick={() => setStudentPendingDelete({ id: student.id, name: student.name || 'this child' })}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-400 transition hover:bg-rose-500/20"
+                              >
+                                Delete Child
+                              </button>
+                            </div>
                           </div>
 
                           <div className="grid gap-3 sm:grid-cols-2 text-xs">
@@ -700,6 +750,55 @@ export function ParentProfileModal({
                   className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-500/20 hover:bg-red-500 disabled:opacity-60"
                 >
                   {isDeletingParent ? 'Deleting...' : 'Yes, Delete Parent'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Child Confirmation Overlay */}
+      <AnimatePresence>
+        {studentPendingDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-20 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+            onClick={() => !isDeletingStudent && setStudentPendingDelete(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-3xl border border-red-500/30 bg-[#140c0c] p-6 text-white shadow-2xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-500/15 text-red-400">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <h3 className="font-display text-lg font-bold text-white">Delete Child Record?</h3>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-ink-300">
+                This permanently removes <strong className="text-white">{studentPendingDelete.name}</strong>'s
+                student record, along with their enrollments, attendance, remarks, and finance logs. The
+                parent's own account and any other linked children are unaffected. This cannot be undone.
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setStudentPendingDelete(null)}
+                  disabled={isDeletingStudent}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-ink-300 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteStudent}
+                  disabled={isDeletingStudent}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-500/20 hover:bg-red-500 disabled:opacity-60"
+                >
+                  {isDeletingStudent ? 'Deleting...' : 'Yes, Delete Child'}
                 </button>
               </div>
             </motion.div>
