@@ -36,6 +36,7 @@ import { getCoachBySlugOrId, DirectoryCoach } from '@/lib/directoryData';
 import { getSportConfig } from '@/lib/sportUtils';
 import { ProfileLightbox } from '@/components/profile/ProfileLightbox';
 import { AppDownloadModal } from '@/components/profile/AppDownloadModal';
+import { FreeTrialModal } from '@/components/profile/FreeTrialModal';
 import { JoinAppCard } from '@/components/profile/JoinAppCard';
 import { CoachingJourney } from '@/components/profile/CoachingJourney';
 import { ShareQrModal } from '@/components/profile/ShareQrModal';
@@ -73,6 +74,7 @@ export function CoachProfile() {
   // Modals state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
+  const [isTrialModalOpen, setIsTrialModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
@@ -289,10 +291,19 @@ export function CoachProfile() {
               {/* Action Buttons Header */}
               <div className="flex flex-wrap items-center gap-3">
                 <button
-                  onClick={() => setIsAppModalOpen(true)}
-                  className="btn-primary flex-1 sm:flex-initial !px-6 !py-3.5 !text-sm font-bold shadow-lg"
+                  onClick={() => setIsTrialModalOpen(true)}
+                  className="group relative flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-500/30 transition hover:shadow-orange-500/50 hover:brightness-105 active:scale-[0.98]"
                 >
-                  <Smartphone className="h-4 w-4" /> Contact Coach
+                  <Sparkles className="h-4 w-4 text-amber-200" />
+                  <span>Book Free Trial</span>
+                </button>
+
+                <button
+                  onClick={() => setIsAppModalOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  <Smartphone className="h-4 w-4" />
+                  <span>Get App</span>
                 </button>
 
                 {socialInfo && coach.social_link && (
@@ -582,6 +593,7 @@ export function CoachProfile() {
                 targetName={coach.name || 'Coach'}
                 targetType="coach"
                 onOpenModal={() => setIsAppModalOpen(true)}
+                onBookFreeTrial={() => setIsTrialModalOpen(true)}
                 variant="sidebar"
               />
 
@@ -648,6 +660,18 @@ export function CoachProfile() {
         />
       )}
 
+      {/* Free Trial Request Modal */}
+      <FreeTrialModal
+        isOpen={isTrialModalOpen}
+        onClose={() => setIsTrialModalOpen(false)}
+        coachId={coach.id}
+        coachName={coach.name || 'Coach'}
+        academyName={coach.academy_name}
+        sportsOffered={coach.sports_offered}
+        coachImageUrl={coach.profile_image_url}
+        locality={coach.locality}
+      />
+
       {/* App Download Modal */}
       <AppDownloadModal
         isOpen={isAppModalOpen}
@@ -685,17 +709,17 @@ export function CoachProfile() {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
+              onClick={() => setIsTrialModalOpen(true)}
+              className="rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md active:scale-95"
+            >
+              Book Free Trial
+            </button>
+            <button
               onClick={() => setIsShareModalOpen(true)}
-              className="grid h-10 w-10 place-items-center rounded-full border border-ink-200 bg-white text-ink-800"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-ink-200 bg-white text-ink-800"
               aria-label="Share"
             >
               <Share2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setIsAppModalOpen(true)}
-              className="btn-primary !px-4 !py-2.5 !text-xs font-bold"
-            >
-              <Smartphone className="h-3.5 w-3.5" /> Get the App
             </button>
           </div>
         </div>
