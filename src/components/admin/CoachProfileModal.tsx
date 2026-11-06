@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { CoachItem } from '@/pages/AdminPortal';
+import { ActionOtpModal } from '@/components/admin/ActionOtpModal';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -135,6 +136,13 @@ export function CoachProfileModal({
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
   const [isConfirmingRoleChange, setIsConfirmingRoleChange] = useState(false);
+
+  // Severe Action OTP Verification State
+  const [pendingOtpAction, setPendingOtpAction] = useState<{
+    type: 'status_change' | 'role_change' | 'settlement_change';
+    title: string;
+    execute: () => Promise<void> | void;
+  } | null>(null);
 
   // Public profile visibility — platform-admin-only; the coach has no field
   // or screen anywhere in the app to see or change this themselves. Fetched
@@ -450,6 +458,23 @@ export function CoachProfileModal({
   if (!isOpen || !coach) return null;
 
   const handleStatus = async (status: 'approved' | 'rejected' | 'paused') => {
+    // If it's a severe action like rejecting/banning a coach, require 2-Step OTP
+    if (status === 'rejected') {
+      setPendingOtpAction({
+        type: 'status_change',
+        title: `Reject / Revoke Coach Access for ${coach.name}`,
+        execute: async () => {
+          setStatusUpdating(true);
+          try {
+            await onStatusUpdate(coach.id, 'rejected');
+          } finally {
+            setStatusUpdating(false);
+          }
+        },
+      });
+      return;
+    }
+
     setStatusUpdating(true);
     try {
       await onStatusUpdate(coach.id, status);
@@ -458,10 +483,7 @@ export function CoachProfileModal({
     }
   };
 
-  // Clicking the badge only opens the confirmation — this is a privileged,
-  // blast-radius-affecting change (it changes what the coach can do in
-  // their own app), not something that should ever fire from one accidental
-  // tap. The actual write happens in confirmRoleChange below.
+  // Clicking the badge opens confirmation with OTP requirement
   const handleRoleToggle = () => {
     if (!onUpdateRole || isUpdatingRole) return;
     setIsConfirmingRoleChange(true);
@@ -469,20 +491,27 @@ export function CoachProfileModal({
 
   const confirmRoleChange = async () => {
     if (!onUpdateRole || isUpdatingRole) return;
-    // 'academy_admin' — not plain 'coach' — is what actually unlocks
-    // academy-management screens (staff, academy settings) within the app;
-    // 'coach'/'staff_coach' are non-admin roles under an academy.
-    const newRole = coach.role === 'independent' ? 'academy_admin' : 'independent';
-    setIsUpdatingRole(true);
-    try {
-      await onUpdateRole(coach.id, newRole);
-      setIsConfirmingRoleChange(false);
-    } catch (_) {
-      // onUpdateRole already surfaces its own error notice; leave the
-      // dialog open so the admin can see the error and retry or cancel.
-    } finally {
-      setIsUpdatingRole(false);
-    }
+    // Previously only toggled independent <-> academy_admin — a plain
+    // 'coach' or 'staff_coach' clicking this fell into the else branch and
+    // got set to 'independent', never actually reaching 'academy_admin'.
+    // Any non-admin role now promotes to academy_admin; an existing
+    // academy_admin demotes back to a regular coach.
+    const newRole = coach.role === 'academy_admin' ? 'coach' : 'academy_admin';
+    setIsConfirmingRoleChange(false);
+
+    // Prompt OTP for Role Modification
+    setPendingOtpAction({
+      type: 'role_change',
+      title: `Change Coach Role to "${newRole === 'academy_admin' ? 'Academy Admin' : 'Coach'}"`,
+      execute: async () => {
+        setIsUpdatingRole(true);
+        try {
+          await onUpdateRole(coach.id, newRole);
+        } finally {
+          setIsUpdatingRole(false);
+        }
+      },
+    });
   };
 
   const toggleBatchDay = (day: string) => {
@@ -1047,18 +1076,18 @@ export function CoachProfileModal({
                             onClick={handleRoleToggle}
                             disabled={isUpdatingRole}
                             className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition disabled:opacity-50 ${
-                              coach.role === 'independent'
-                                ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30 hover:bg-purple-500/25'
-                                : 'bg-orange-500/15 text-orange-400 border border-orange-500/30 hover:bg-orange-500/25'
+                              coach.role === 'academy_admin'
+                                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30 hover:bg-orange-500/25'
+                                : 'bg-purple-500/15 text-purple-400 border border-purple-500/30 hover:bg-purple-500/25'
                             }`}
-                            title="Click to switch this coach's type"
+                            title={coach.role === 'academy_admin' ? 'Click to demote to a regular coach' : "Click to promote to Academy Admin — lets them add/manage their own coaches, batches, fees and students"}
                           >
                             {isUpdatingRole && <RefreshCw className="h-3 w-3 animate-spin" />}
-                            {coach.role === 'independent' ? 'Individual Coach' : 'Academy Coach'}
+                            {coach.role === 'academy_admin' ? 'Academy Admin' : 'Promote to Academy Admin'}
                           </button>
                         ) : (
                           <span className="font-bold text-white">
-                            {coach.role === 'independent' ? 'Individual Coach' : 'Academy Coach'}
+                            {coach.role === 'academy_admin' ? 'Academy Admin' : 'Coach'}
                           </span>
                         )}
                       </div>
@@ -2383,9 +2412,14 @@ export function CoachProfileModal({
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <h3 className="mt-4 font-display text-lg font-bold text-white">
-                Switch {coach.name} to {coach.role === 'independent' ? 'Academy Coach' : 'Individual Coach'}?
+                {coach.role === 'academy_admin'
+                  ? `Demote ${coach.name} to a regular Coach?`
+                  : `Promote ${coach.name} to Academy Admin?`}
               </h3>
               <p className="mt-1.5 text-xs text-ink-400 leading-relaxed">
+                {coach.role === 'academy_admin'
+                  ? 'They will lose the ability to add/manage other coaches, batches, fees and students under their academy.'
+                  : 'They will be able to add and manage their own coaches, assign batches, fees and students.'}{' '}
                 This changes their role in the live database immediately. {coach.name} will see whatever screens
                 and permissions the new type grants the next time their app refreshes their profile (typically
                 their next login) — this does not force-log them out right now.
@@ -2410,13 +2444,28 @@ export function CoachProfileModal({
                   )}
                   <span>
                     {isUpdatingRole
-                      ? 'Switching...'
-                      : `Switch to ${coach.role === 'independent' ? 'Academy Coach' : 'Individual Coach'}`}
+                      ? 'Updating...'
+                      : coach.role === 'academy_admin'
+                      ? 'Demote to Coach'
+                      : 'Promote to Academy Admin'}
                   </span>
                 </button>
               </div>
             </motion.div>
           </motion.div>
+        )}
+        {/* Severe Action OTP Verification Modal */}
+        {pendingOtpAction && (
+          <ActionOtpModal
+            isOpen={Boolean(pendingOtpAction)}
+            onClose={() => setPendingOtpAction(null)}
+            onVerified={pendingOtpAction.execute}
+            actionTitle={pendingOtpAction.title}
+            targetName={coach.name}
+            targetId={coach.id}
+            actionType={pendingOtpAction.type}
+            dangerLevel="critical"
+          />
         )}
       </AnimatePresence>
     </div>

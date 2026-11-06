@@ -71,6 +71,7 @@ export function FreeTrialModal({
   const [selectedDay, setSelectedDay] = useState(PREFERRED_DAYS[0]);
   const [selectedSlot, setSelectedSlot] = useState(PREFERRED_SLOTS[0]);
   const [notes, setNotes] = useState('');
+  const [coachPhone, setCoachPhone] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -114,6 +115,8 @@ export function FreeTrialModal({
         ? childName.trim()
         : `${parentName.trim()} (Self)`;
 
+      const preferredBatch = `${selectedDay} • ${selectedSlot}`;
+
       const combinedNotes = [
         `Preferred: ${selectedDay} | ${selectedSlot}`,
         notes.trim() ? `Note: ${notes.trim()}` : '',
@@ -123,43 +126,110 @@ export function FreeTrialModal({
         .filter(Boolean)
         .join(' • ');
 
-      const payload = {
+      // Standardize phone with +91 country prefix for seamless TruCoach app binding
+      const standardizedPhone = `+91${phone10}`;
+
+      // Check if this parent is already registered in TruCoach profiles
+      let parentUserId: string | null = null;
+      try {
+        const { data: existingProf } = await supabase
+          .from('profiles')
+          .select('id')
+          .or(`phone.eq.${phone10},phone.eq.+91${phone10},phone.eq.91${phone10}`)
+          .maybeSingle();
+        if (existingProf?.id) {
+          parentUserId = existingProf.id;
+        }
+      } catch (_) {}
+
+      // Align with actual public.admission_requests table schema:
+      // - status: 'pending' (required by table RLS policy: 'pending' | 'trial_active' | 'trial_completed' | 'approved' | 'rejected')
+      // - parent_phone, tutor_id, tutor_name, sport_name: required columns
+      // - preferred_batch_title, trial_classes_count (default: 2)
+      // - parent_id & parent_user_id: mapped to user UUID so it renders in the TruCoach app
+      const payload: Record<string, any> = {
         tutor_id: coachId,
+        tutor_name: coachName,
         parent_name: parentName.trim(),
-        parent_phone: phone10,
+        parent_phone: standardizedPhone,
         child_name: fullAthleteInfo,
         child_age: approxAge,
-        sport_name: selectedSport,
+        sport_name: selectedSport || 'Sports Training',
+        preferred_batch_title: preferredBatch,
         request_type: 'trial',
-        status: 'new',
-        notes: combinedNotes,
+        trial_classes_count: 2,
+        status: 'pending',
+        tutor_notes: combinedNotes,
+        trial_time: selectedSlot,
+        trial_location: locality || '',
         created_at: new Date().toISOString(),
       };
 
-      // 1. Write to main Supabase admission_requests (visible to admin & coach portal)
-      const { error: mainError } = await supabase.from('admission_requests').insert([payload]);
+      if (parentUserId) {
+        payload.parent_id = parentUserId;
+        payload.parent_user_id = parentUserId;
+      }
 
-      // If main table has slightly different columns, gracefully handle and log
+      // 1. Write to main Supabase admission_requests (visible to admin & coach mobile app)
+      const { data: insertedData, error: mainError } = await supabase
+        .from('admission_requests')
+        .insert([payload])
+        .select()
+        .single();
+
       if (mainError) {
-        console.warn('Direct insert into main database trial_requests failed, trying minimal schema:', mainError);
-        // Retry with core minimum fields
-        const minimalPayload = {
-          tutor_id: coachId,
-          parent_name: parentName.trim(),
-          parent_phone: phone10,
-          child_name: fullAthleteInfo,
-          child_age: approxAge,
-          sport_name: selectedSport,
-          request_type: 'trial',
-          status: 'new',
-        };
-        const { error: retryError } = await supabase.from('admission_requests').insert([minimalPayload]);
-        if (retryError) {
-          console.error('Trial request retry error:', retryError);
+        console.error('Direct insert into admission_requests failed:', mainError);
+        throw new Error(mainError.message || 'Failed to submit trial request');
+      }
+
+      const requestId = insertedData?.id || `TRIAL-${Date.now()}`;
+
+      // 2. Fetch coach contact details for direct WhatsApp communication
+      let coachNotifyPhone: string | null = null;
+      try {
+        const { data: tutorDoc } = await supabase
+          .from('tutors_public')
+          .select('phone, phone_number')
+          .eq('id', coachId)
+          .maybeSingle();
+        const rawTutorPhone = (tutorDoc?.phone || tutorDoc?.phone_number || '').replace(/[^0-9]/g, '');
+        if (rawTutorPhone.length >= 10) {
+          setCoachPhone(rawTutorPhone.slice(-10));
+          coachNotifyPhone = rawTutorPhone.length === 10 ? `91${rawTutorPhone}` : rawTutorPhone;
+        }
+      } catch (_) {}
+
+      // 2b. Alert the coach on WhatsApp via the Meta-approved "new_lead_alert"
+      // template — mirrors the in-app free-trial/admission flow so a coach
+      // gets notified the same way regardless of whether the lead came from
+      // the TruCoach app or the public website. Any field that could be
+      // empty is shown as "Not Available" rather than sent blank.
+      if (coachNotifyPhone) {
+        try {
+          await supabase.functions.invoke('send-whatsapp-message', {
+            body: {
+              recipient_phone: coachNotifyPhone,
+              event_key: 'new_lead_alert',
+              template_name: 'new_lead_alert',
+              message: `New Free Trial Request\n\nParent: ${parentName.trim() || 'Not Available'}\nPhone: ${standardizedPhone}\nStudent: ${fullAthleteInfo}\nSport: ${selectedSport || 'Not Available'}\nPreferred Batch: ${preferredBatch || 'Not Available'}\nRequested On: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+              template_header_params: ['Free Trial'],
+              template_params: [
+                parentName.trim() || 'Not Available',
+                standardizedPhone || 'Not Available',
+                childName.trim() || 'Not Available',
+                approxAge ? `${approxAge}` : 'Not Available',
+                selectedSport || 'Not Available',
+                preferredBatch || 'Not Available',
+                new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+              ],
+            },
+          });
+        } catch (waErr) {
+          console.warn('WhatsApp new_lead_alert dispatch failed:', waErr);
         }
       }
 
-      // 2. Also dispatch an instant admin email alert via the send-email-notification edge function
+      // 3. Dispatch admin email alert via the send-email-notification edge function
       try {
         await supabase.functions.invoke('send-email-notification', {
           body: {
@@ -170,7 +240,7 @@ export function FreeTrialModal({
             role: 'parent',
             category: 'Free Trial Request',
             subject: `🎯 New Free Trial Request for Coach ${coachName} (${selectedSport})`,
-            message: `New Free Trial Request details:\n\n• Coach: ${coachName} (ID: ${coachId})\n• Academy: ${academyName || 'Independent'}\n• Parent: ${parentName.trim()}\n• Phone / WhatsApp: ${phone10}\n• Athlete: ${fullAthleteInfo} (Age ~${approxAge})\n• Sport: ${selectedSport}\n• Preferred Day: ${selectedDay}\n• Preferred Time: ${selectedSlot}\n• Note: ${notes.trim() || 'None'}\n• Submitted: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
+            message: `New Free Trial Request details:\n\n• Request ID: ${requestId}\n• Coach: ${coachName} (ID: ${coachId})\n• Academy: ${academyName || 'Independent'}\n• Parent: ${parentName.trim()}\n• Phone / WhatsApp: ${standardizedPhone}\n• Athlete: ${fullAthleteInfo} (Age ~${approxAge})\n• Sport: ${selectedSport}\n• Preferred Batch / Slot: ${preferredBatch}\n• Note: ${notes.trim() || 'None'}\n• Submitted: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
             ticket_id: `TRIAL-${Date.now()}`,
           },
         });
@@ -189,9 +259,11 @@ export function FreeTrialModal({
 
   const handleWhatsAppDirect = () => {
     const text = encodeURIComponent(
-      `Hi Coach ${coachName}! I'm interested in booking a Free Trial session for ${selectedSport} via TruCoach. Please let me know the available batch time.`
+      `Hi Coach ${coachName}! I just requested a Free Trial session for ${selectedSport} via TruCoach for ${childName.trim() || parentName.trim()}. Looking forward to the session schedule.`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const target = coachPhone ? (coachPhone.length === 10 ? `91${coachPhone}` : coachPhone) : '';
+    const waUrl = target ? `https://wa.me/${target}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -493,6 +565,17 @@ export function FreeTrialModal({
                 <div className="flex justify-between">
                   <span className="text-ink-400">Preferred Slot:</span>
                   <span className="text-orange-300">{selectedDay} ({selectedSlot})</span>
+                </div>
+              </div>
+
+              {/* TruCoach Mobile App Realtime Sync Banner */}
+              <div className="mt-4 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-3.5 text-xs text-left max-w-md mx-auto flex items-start gap-3">
+                <Sparkles className="h-4 w-4 text-orange-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-white">Track Live in TruCoach App</p>
+                  <p className="mt-0.5 text-ink-300 leading-relaxed text-[11px]">
+                    This request is synced directly to TruCoach. Open or download the app and log in with <strong className="text-orange-300">{parentPhone}</strong> to view your trial pass under <strong className="text-white">"My Applications & Trials"</strong>.
+                  </p>
                 </div>
               </div>
 

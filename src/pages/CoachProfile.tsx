@@ -4,6 +4,7 @@ import {
   MapPin,
   Loader2,
   ArrowLeft,
+  ArrowRight,
   Sparkles,
   ShieldCheck,
   Trophy,
@@ -211,112 +212,123 @@ export function CoachProfile() {
             </div>
 
             {/* Profile Header Main Identity */}
-            <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                {/* Large Profile Avatar */}
-                <div className="relative shrink-0">
-                  <div className="relative h-28 w-28 overflow-hidden rounded-3xl border-4 border-white/20 bg-ink-900 shadow-2xl sm:h-36 sm:w-36">
-                    {coach.profile_image_url ? (
-                      <img
-                        src={coach.profile_image_url}
-                        alt={coach.name || 'Coach'}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        className={`grid h-full w-full place-items-center bg-gradient-to-br ${getSeedGradient(coach.id)} font-display text-4xl font-700 text-white shadow-inner`}
-                      >
-                        {(coach.name || 'C').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
+            <div className="mt-8 rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-transparent p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  {/* Large Profile Avatar with Live Ping & Verified Badge */}
+                  <div className="relative shrink-0 self-start sm:self-center">
+                    <div className="relative h-28 w-28 overflow-hidden rounded-3xl border-2 border-white/30 bg-ink-900 shadow-2xl sm:h-36 sm:w-36">
+                      {coach.profile_image_url ? (
+                        <img
+                          src={coach.profile_image_url}
+                          alt={coach.name || 'Coach'}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`grid h-full w-full place-items-center bg-gradient-to-br ${getSeedGradient(coach.id)} font-display text-4xl font-700 text-white shadow-inner`}
+                        >
+                          {(coach.name || 'C').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Status Badge */}
-                  <span
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/20 bg-ink-900/90 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-green-400 shadow-md backdrop-blur"
-                  >
-                    <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                    Available
-                  </span>
-                </div>
-
-                {/* Name, Designation & Badges */}
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/20 px-3 py-1 text-xs font-bold text-orange-400 border border-orange-500/30 backdrop-blur">
-                      <Sparkles className="h-3.5 w-3.5" /> Certified Coach
-                    </span>
-                    {coach.is_verified && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-400 border border-green-500/30 backdrop-blur">
-                        <ShieldCheck className="h-3.5 w-3.5" /> TruCoach Verified
-                      </span>
-                    )}
-                  </div>
-
-                  <h1 className="mt-2.5 font-display text-3xl font-700 tracking-tight text-white sm:text-4xl lg:text-5xl">
-                    {coach.name || 'Coach'}
-                  </h1>
-
-                  <p className="mt-1.5 text-base font-semibold text-ink-300 sm:text-lg">
-                    {coach.designation || 'Head Coach'}
-                    {coach.academy_name && (
-                      <span className="text-white">
-                        {' '}
-                        · <span className="text-orange-400 font-bold">{coach.academy_name}</span>
-                      </span>
-                    )}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-ink-300">
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-ink-300 hover:text-white transition-colors"
+                    {/* Live Availability Pill */}
+                    <span
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-500/40 bg-ink-950/95 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400 shadow-lg backdrop-blur"
                     >
-                      <MapPin className="h-3.5 w-3.5 text-orange-400" />
-                      {[coach.locality, coach.pincode].filter(Boolean).join(' · ') || 'Location on file'}
-                    </a>
-
-                    {coach.years_of_experience != null && (
-                      <span className="inline-flex items-center gap-1 text-ink-300">
-                        <Trophy className="h-3.5 w-3.5 text-amber-400" />
-                        {coach.years_of_experience}+ Years Experience
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                       </span>
+                      Accepting Trials
+                    </span>
+                  </div>
+
+                  {/* Name, Designation & Badges */}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/20 px-3 py-1 text-xs font-bold text-orange-400 border border-orange-500/30 backdrop-blur">
+                        <Sparkles className="h-3.5 w-3.5" /> Certified Coach
+                      </span>
+                      {coach.is_verified && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/30 backdrop-blur">
+                          <ShieldCheck className="h-3.5 w-3.5" /> TruCoach Verified
+                        </span>
+                      )}
+                      {coach.academy_name && (
+                        <Link
+                          to="/academies"
+                          className="inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 border border-white/10 transition"
+                        >
+                          <span>{coach.academy_name}</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    <h1 className="mt-2.5 font-display text-3xl font-700 tracking-tight text-white sm:text-4xl lg:text-5xl">
+                      {coach.name || 'Coach'}
+                    </h1>
+
+                    <p className="mt-1 text-sm sm:text-base font-semibold text-ink-300">
+                      {coach.designation || 'Head Sports Mentor'}
+                    </p>
+
+                    {/* Location & Experience Metadata */}
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-ink-300">
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-ink-300 hover:text-white transition-colors bg-white/5 border border-white/10 rounded-full px-3 py-1"
+                      >
+                        <MapPin className="h-3.5 w-3.5 text-orange-400" />
+                        {[coach.locality, coach.pincode].filter(Boolean).join(' · ') || 'Hyderabad Facility'}
+                      </a>
+
+                      {coach.years_of_experience != null && (
+                        <span className="inline-flex items-center gap-1.5 text-ink-200 bg-white/5 border border-white/10 rounded-full px-3 py-1">
+                          <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                          <strong className="text-white">{coach.years_of_experience}+ Years</strong> Mentoring
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Action Header Box */}
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0 pt-4 lg:pt-0 border-t border-white/10 lg:border-t-0">
+                  <button
+                    onClick={() => setIsTrialModalOpen(true)}
+                    className="group relative inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-500/30 transition hover:shadow-orange-500/50 hover:brightness-105 active:scale-[0.98]"
+                  >
+                    <Sparkles className="h-4 w-4 text-amber-200" />
+                    <span>Book Free Trial on Website</span>
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsAppModalOpen(true)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20"
+                    >
+                      <Smartphone className="h-3.5 w-3.5" />
+                      <span>Get App</span>
+                    </button>
+
+                    {socialInfo && coach.social_link && (
+                      <a
+                        href={coach.social_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20"
+                      >
+                        <socialInfo.icon className="h-3.5 w-3.5" />
+                        <span>{socialInfo.label}</span>
+                      </a>
                     )}
                   </div>
                 </div>
-              </div>
-
-              {/* Action Buttons Header */}
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={() => setIsTrialModalOpen(true)}
-                  className="group relative flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-500/30 transition hover:shadow-orange-500/50 hover:brightness-105 active:scale-[0.98]"
-                >
-                  <Sparkles className="h-4 w-4 text-amber-200" />
-                  <span>Book Free Trial</span>
-                </button>
-
-                <button
-                  onClick={() => setIsAppModalOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
-                >
-                  <Smartphone className="h-4 w-4" />
-                  <span>Get App</span>
-                </button>
-
-                {socialInfo && coach.social_link && (
-                  <a
-                    href={coach.social_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
-                  >
-                    <socialInfo.icon className="h-4 w-4" />
-                    <span>{socialInfo.label}</span>
-                  </a>
-                )}
               </div>
             </div>
           </div>

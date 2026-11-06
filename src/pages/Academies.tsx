@@ -22,6 +22,7 @@ import { Footer } from '@/components/Footer';
 import { BackToTop } from '@/components/BackToTop';
 import { searchAcademies, searchCoaches, DirectoryAcademy, DirectoryCoach } from '@/lib/directoryData';
 import { getSportConfig } from '@/lib/sportUtils';
+import { CoachCard } from '@/components/profile/CoachCard';
 
 const MIN_RESULTS_FOR_GRID = 1;
 
@@ -578,73 +579,7 @@ export function Academies() {
 
                     <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                       {filteredCoaches.map((c) => (
-                        <Link
-                          key={c.id}
-                          to={`/coach/${c.slug || c.id}`}
-                          className="group overflow-hidden rounded-3xl border border-ink-100 bg-white p-5 shadow-[0_12px_32px_-20px_rgba(15,18,25,0.1)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div
-                              className={`grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br ${avatarGradient(
-                                c.id
-                              )}`}
-                            >
-                              {c.profile_image_url ? (
-                                <img
-                                  src={c.profile_image_url}
-                                  alt={c.name || 'Coach'}
-                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <span className="font-display text-xl font-700 text-white/90">
-                                  {(c.name || 'C').charAt(0).toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <h3 className="truncate font-display text-base font-700 text-ink-950 group-hover:text-blue-600 transition-colors">
-                                  {c.name || 'Coach'}
-                                </h3>
-                                {c.is_verified && <ShieldCheck className="h-4 w-4 shrink-0 text-green-500" />}
-                              </div>
-                              <p className="truncate text-xs text-ink-500">
-                                {c.designation || c.academy_name || 'Independent Coach'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Sports badges */}
-                          {c.sports_offered && c.sports_offered.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-1.5">
-                              {c.sports_offered.slice(0, 3).map((s) => {
-                                const cfg = getSportConfig(s);
-                                return (
-                                  <span
-                                    key={s}
-                                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${cfg.badgeBg} ${cfg.badgeText} ${cfg.badgeBorder}`}
-                                  >
-                                    {s}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3.5 text-xs font-medium text-ink-500">
-                            <span className="inline-flex items-center gap-1.5">
-                              <MapPin className="h-3.5 w-3.5 text-blue-500" />
-                              {[c.locality, c.pincode].filter(Boolean).join(' · ') || 'Location coming soon'}
-                            </span>
-                            {c.years_of_experience != null && (
-                              <span className="inline-flex items-center gap-1 font-bold text-ink-800">
-                                <Trophy className="h-3.5 w-3.5 text-amber-500" />
-                                {c.years_of_experience}+ yrs
-                              </span>
-                            )}
-                          </div>
-                        </Link>
+                        <CoachCard key={c.id} coach={c} avatarGradient={avatarGradient} />
                       ))}
                     </div>
                   </div>

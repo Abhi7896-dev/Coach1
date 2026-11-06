@@ -34,9 +34,14 @@ export async function getAdminRole(userId: string): Promise<'admin' | 'superadmi
   try {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('email, role')
       .eq('id', userId)
       .maybeSingle();
+
+    // STRICT LOCKDOWN: Only admin@trucoach.co.in is allowed platform admin privileges
+    if (profile?.email?.toLowerCase() !== 'admin@trucoach.co.in') {
+      return null;
+    }
 
     if (profile?.role === 'admin' || profile?.role === 'superadmin') {
       return profile.role;

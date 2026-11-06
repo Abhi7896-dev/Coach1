@@ -47,6 +47,37 @@ function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
+// Excel date cells don't come back from SheetJS as a plain "YYYY-MM-DD"
+// string in every case — depending on how the cell is formatted, the raw
+// value can be a JS Date object, an Excel serial day-number (e.g. 45943),
+// or already text. join_date/paid_until get written straight into date
+// columns downstream, so any of these left un-normalized becomes an
+// invalid-date error (or a silently wrong date) at import time.
+function normalizeDateCell(value: any): string {
+  if (value === null || value === undefined || value === '') return '';
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'number' && isFinite(value)) {
+    // Excel serial date: days since 1899-12-30 (accounts for Excel's
+    // fictitious 1900 leap year).
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    const parsed = new Date(epoch.getTime() + value * 86400000);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  }
+  const str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // Common spreadsheet text formats: DD/MM/YYYY or DD-MM-YYYY.
+  const slashMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (slashMatch) {
+    const [, d, m, y] = slashMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  const parsedGeneric = new Date(str);
+  if (!isNaN(parsedGeneric.getTime())) return parsedGeneric.toISOString().slice(0, 10);
+  return str;
+}
+
 // Admin-assisted onboarding: a coach's existing roster, brought in from a
 // spreadsheet instead of typed in one by one through the mobile app. Treated
 // as EXISTING students by design — no invoice is seeded on import, since
@@ -99,7 +130,7 @@ export function BulkStudentImportDashboard({ coaches }: BulkStudentImportDashboa
     try {
       const XLSX = await import('xlsx');
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
@@ -124,8 +155,8 @@ export function BulkStudentImportDashboard({ coaches }: BulkStudentImportDashboa
           age: String(normalized.age || '10'),
           guardian_name: String(normalized.guardian_name || '').trim(),
           parent_phone: parentPhone,
-          join_date: String(normalized.join_date || '').trim(),
-          paid_until: String(normalized.paid_until || '').trim(),
+          join_date: normalizeDateCell(normalized.join_date),
+          paid_until: normalizeDateCell(normalized.paid_until),
           error,
         };
       });

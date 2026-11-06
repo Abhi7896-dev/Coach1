@@ -60,6 +60,7 @@ import { MessageLogsDashboard } from '@/components/admin/MessageLogsDashboard';
 import { AccountDeletionRequestsDashboard } from '@/components/admin/AccountDeletionRequestsDashboard';
 import { CommunityEventsDashboard } from '@/components/admin/CommunityEventsDashboard';
 import { PlatformSettingsDashboard } from '@/components/admin/PlatformSettingsDashboard';
+import { PurgeIdentityPanel } from '@/components/admin/PurgeIdentityPanel';
 import { AuthRegistryDashboard } from '@/components/admin/AuthRegistryDashboard';
 import { AdminAccountDashboard } from '@/components/admin/AdminAccountDashboard';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
@@ -471,7 +472,13 @@ export function AdminPortal() {
           if (t.id && role !== 'parent' && role !== 'admin') {
             const id = t.id;
             const existing = coachMap.get(id);
-            const acadId = t.academy_id || existing?.academyId;
+            // An academy_admin's own tutors row has academy_id = NULL — the
+            // academies row they administer has id = their own user id
+            // instead. Use that as this coach's academy id so they group
+            // with their own staff coaches (who DO have academy_id set to
+            // the admin's id) under one real academy, instead of splitting
+            // into two cards keyed by possibly-mismatched name strings.
+            const acadId = t.academy_id || (role === 'academy_admin' ? id : existing?.academyId);
             const computedAcadName =
               (acadId && academiesMap.get(acadId)) ||
               t.academy_name ||
@@ -511,11 +518,15 @@ export function AdminPortal() {
       // ─────────────────────────────────────────────────────────────
       const academyGroupMap = new Map<string, AcademyItem>();
       cleanCoachesList.forEach((c) => {
-        const acadKey = (c.academyName || 'Sports Academy').trim();
+        // Group by the real academy id whenever one is known — grouping by
+        // the display name string alone split an academy_admin's own card
+        // from their staff coaches' card whenever the name strings didn't
+        // match exactly (see acadId computation above).
+        const acadKey = c.academyId || 'name_' + (c.academyName || 'Sports Academy').trim().toLowerCase();
         if (!academyGroupMap.has(acadKey)) {
           academyGroupMap.set(acadKey, {
-            id: c.academyId || 'acad_' + acadKey.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-            name: acadKey,
+            id: c.academyId || acadKey,
+            name: (c.academyName || 'Sports Academy').trim(),
             headCoachName: c.name,
             headCoachPhone: c.phone,
             locality: c.locality,
@@ -536,6 +547,12 @@ export function AdminPortal() {
               if (!existing.sportsOffered.includes(s)) existing.sportsOffered.push(s);
             });
             existing.coaches.push(c);
+            // Whichever record arrives second, always surface the academy_admin
+            // as "Lead" rather than whichever staff coach happened to be seen first.
+            if (c.role === 'academy_admin') {
+              existing.headCoachName = c.name;
+              existing.headCoachPhone = c.phone;
+            }
           }
         }
       });
@@ -825,7 +842,7 @@ export function AdminPortal() {
       setSelectedCoach({ ...selectedCoach, role: newRole });
     }
 
-    showNotice('success', `Coach role updated to "${newRole === 'independent' ? 'Individual Coach' : 'Academy Coach'}".`);
+    showNotice('success', `Coach role updated to "${newRole === 'academy_admin' ? 'Academy Admin' : 'Coach'}".`);
   };
 
   const handleUpdateTicketStatus = async (ticketId: string, newStatus: 'in_progress' | 'resolved') => {
@@ -2633,7 +2650,10 @@ export function AdminPortal() {
         {activeTab === 'settings' && (
           <div className="space-y-6">
             {adminUser?.isSuperAdmin ? (
-              <PlatformSettingsDashboard config={platformConfig} onSaved={(updated) => setPlatformConfig(updated)} />
+              <>
+                <PlatformSettingsDashboard config={platformConfig} onSaved={(updated) => setPlatformConfig(updated)} />
+                <PurgeIdentityPanel />
+              </>
             ) : (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-10 text-center">
                 <ShieldAlert className="h-7 w-7 text-ink-500" />
